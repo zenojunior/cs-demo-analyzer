@@ -3,7 +3,7 @@
 # Multi-stage build for the CS Demo Analyzer SPA.
 #   1. deps  -> restore the pnpm store (cached, rarely invalidated)
 #   2. build -> compile the Vue/Vite app into static assets
-#   3. final -> serve those assets with nginx (no Node in the runtime image)
+#   3. final -> serve those assets with a tiny Node static server on $PORT
 # The Rust/WASM parser is already committed, so no Rust toolchain is needed here.
 
 # ---- 1. Dependencies ---------------------------------------------------------
@@ -37,12 +37,18 @@ COPY . .
 RUN pnpm build
 
 # ---- 3. Runtime --------------------------------------------------------------
-# Tiny static image: just nginx serving the built assets.
-FROM nginx:1.27-alpine AS runtime
+# Minimal Node image: a tiny dependency-free server (server.mjs) serves ./dist
+# with SPA history fallback and the correct application/wasm MIME type. No npm
+# install needed at runtime, so the image stays small.
+FROM node:22-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
 
-# SPA routing + correct .wasm MIME + asset caching live in this config.
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/apps/app/dist /usr/share/nginx/html
+# Port Traefik/Dokploy routes to. Override with -e PORT=... if needed.
+ENV PORT=5174
 
-EXPOSE 80
-# nginx:alpine already runs `nginx -g 'daemon off;'` as its default CMD.
+COPY server.mjs ./
+COPY --from=build /app/apps/app/dist ./dist
+
+EXPOSE 5174
+CMD ["node", "server.mjs"]
