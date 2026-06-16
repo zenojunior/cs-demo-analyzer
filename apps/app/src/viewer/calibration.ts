@@ -59,7 +59,7 @@ export const MAP_CALIBRATION: Record<string, MapCalibration> = {
   de_ancient: { radar: '/maps/de_ancient_radar.png', scale: 5.0, posX: -2953, posY: 2164 },
   de_anubis: { radar: '/maps/de_anubis_radar.png', scale: 5.22, posX: -2796, posY: 3328 },
   de_overpass: { radar: '/maps/de_overpass_radar.png', scale: 5.2, posX: -4831, posY: 1781 },
-  de_cache: { radar: '/maps/de_cache_radar.png', scale: 5.54, posX: -2031, posY: 2284 },
+  de_cache: { radar: '/maps/de_cache_radar.png', scale: 5.5, posX: -2000, posY: 3250 },
   de_vertigo: {
     radar: '/maps/de_vertigo_radar.png',
     scale: 4.0,
