@@ -91,10 +91,17 @@ const advancedOptions = computed(() => [
     description: t('viewer.autoAdvanceDesc'),
     enabled: r.autoAdvance.value,
   },
+  {
+    key: 'skipFreeze',
+    label: t('viewer.skipFreeze'),
+    description: t('viewer.skipFreezeDesc'),
+    enabled: r.skipFreeze.value,
+  },
 ])
 function toggleAdvanced(key: string) {
   if (key === 'autoZoom') autoZoom.value = !autoZoom.value
   else if (key === 'autoAdvance') r.autoAdvance.value = !r.autoAdvance.value
+  else if (key === 'skipFreeze') r.skipFreeze.value = !r.skipFreeze.value
 }
 
 const calibration = computed(() => {

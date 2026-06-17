@@ -37,6 +37,12 @@ export function useReplay() {
   const speed = ref<number>(1)
   /** When set, reaching the end of a round rolls straight into the next one. */
   const autoAdvance = useLocalStorage('viewer.advanced.autoAdvance', false)
+  /**
+   * When set, switching rounds starts right after the freeze time instead of
+   * playing it. Handy for matches without comms (e.g. majors), where the buy
+   * period has nothing to watch. The freeze still stays scrubbable to the left.
+   */
+  const skipFreeze = useLocalStorage('viewer.advanced.skipFreeze', false)
 
   const round = computed<Round | null>(() => replay.value?.rounds[roundIndex.value] ?? null)
   const frameCount = computed(() => round.value?.frames.length ?? 0)
@@ -206,16 +212,20 @@ export function useReplay() {
     return Math.max(0, frames.length - 1)
   }
 
+  /** Frame index where the round goes live (right after the freeze time). */
+  function liveFrame(r: Round): number {
+    const fs = r.freezeStartTick ?? r.startTick
+    const liveT = (r.startTick - fs) / (replay.value?.demoTickRate || 64)
+    return frameAtT(r.frames, liveT)
+  }
+
   function selectRound(i: number) {
     if (!replay.value) return
     const idx = Math.max(0, Math.min(i, replay.value.rounds.length - 1))
     roundIndex.value = idx
     frac.value = 0
     // Start at the live round (the freeze stays to the left, scrubbable).
-    const r = replay.value.rounds[idx]
-    const fs = r.freezeStartTick ?? r.startTick
-    const liveT = (r.startTick - fs) / (replay.value.demoTickRate || 64)
-    frameIndex.value = frameAtT(r.frames, liveT)
+    frameIndex.value = liveFrame(replay.value.rounds[idx])
   }
 
   function seek(i: number) {
@@ -259,9 +269,11 @@ export function useReplay() {
     if (pos >= frameCount.value - 1) {
       const lastRound = replay.value ? replay.value.rounds.length - 1 : 0
       if (autoAdvance.value && roundIndex.value < lastRound) {
-        // Start at frame 0 so the freeze time plays too (don't skip to "live").
+        const next = replay.value!.rounds[roundIndex.value + 1]
         roundIndex.value = roundIndex.value + 1
-        frameIndex.value = 0
+        // With skipFreeze on, jump past the freeze time; otherwise start at
+        // frame 0 so the freeze plays too.
+        frameIndex.value = skipFreeze.value ? liveFrame(next) : 0
         frac.value = 0
         last = 0 // reset timing so the gap between rounds isn't counted as elapsed
         raf = requestAnimationFrame(tick)
@@ -304,6 +316,7 @@ export function useReplay() {
     playing,
     speed,
     autoAdvance,
+    skipFreeze,
     round,
     players,
     currentT,
