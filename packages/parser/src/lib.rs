@@ -365,6 +365,14 @@ struct Collector {
     pawn_to_steam: HashMap<u32, String>,
     last_cap: u32,
     tick_step: u32,
+    /// Total demo ticks (from the file header), used as the progress denominator.
+    total_ticks: u32,
+    /// Last tick a progress update was emitted, to throttle the callback.
+    last_progress_tick: u32,
+    /// Progress sink (used by the wasm build): `(stage, current_tick, total_ticks)`.
+    /// Stage 0 = parsing, reported per-tick from `on_tick_start`; later stages are
+    /// reported by `parse_all` once the tick loop is done.
+    progress: Option<Box<dyn FnMut(u32, u32, u32)>>,
     /// Voice/comms: raw Opus packets per speaker, in absolute demo ticks.
     /// (steamId, tick, voice_level, Opus packet). Each packet is an Opus frame
     /// decodable directly (48kHz mono) in the browser; no Steam SDK needed.
@@ -766,6 +774,17 @@ impl Collector {
         let tick = ctx.tick();
         if tick == u32::MAX {
             return Ok(());
+        }
+
+        // Emit throttled parse progress (stage 0) so the UI can show a real bar.
+        if self.total_ticks > 0
+            && tick.wrapping_sub(self.last_progress_tick) >= PROGRESS_TICK_INTERVAL
+        {
+            self.last_progress_tick = tick;
+            let total = self.total_ticks;
+            if let Some(cb) = self.progress.as_mut() {
+                cb(0, tick.min(total), total);
+            }
         }
 
         // Refresh the pawn -> steamId map every tick (the pawn is recreated per
@@ -1916,14 +1935,33 @@ fn build_voice_blob(c: &Collector) -> Vec<u8> {
 /// layout above (empty when the demo has no recorded voice).
 /// `frame_rate` is the number of gameplay samples per second (downsample); 8 is a
 /// good default. Voice is not affected by the downsample (all packets are kept).
-pub fn parse_all(bytes: &[u8], frame_rate: u32) -> Result<(String, Vec<u8>), String> {
+pub fn parse_all<F: FnMut(u32, u32, u32) + 'static>(
+    bytes: &[u8],
+    frame_rate: u32,
+    on_progress: F,
+) -> Result<(String, Vec<u8>), String> {
     let frame_rate = frame_rate.max(1);
     let tick_step = ((DEMO_TICK_RATE / frame_rate as f64).round() as u32).max(1);
 
     let mut parser = Parser::from_slice(bytes).map_err(|e| format!("{e}"))?;
+    // Total ticks come from the file header (read up front), the progress denominator.
+    let total_ticks = parser.replay_info().playback_ticks() as u32;
     let collector: Rc<RefCell<Collector>> = parser.register_observer::<Collector>();
-    collector.borrow_mut().tick_step = tick_step;
+    {
+        let mut c = collector.borrow_mut();
+        c.tick_step = tick_step;
+        c.total_ticks = total_ticks;
+        c.progress = Some(Box::new(on_progress));
+    }
     parser.run_to_end().map_err(|e| format!("{e}"))?;
+
+    // Pull the progress sink back out to report the post-loop stages directly.
+    let mut progress = collector.borrow_mut().progress.take();
+    let mut report = |stage: u32| {
+        if let Some(cb) = progress.as_mut() {
+            cb(stage, 0, 0);
+        }
+    };
 
     let c = collector.borrow();
     #[cfg(not(feature = "wasm"))]
@@ -1940,16 +1978,22 @@ pub fn parse_all(bytes: &[u8], frame_rate: u32) -> Result<(String, Vec<u8>), Str
         c.defuse_begins.len(),
         c.defuse_ends.len(),
     );
+    report(1); // building the replay
     let replay = build_replay(&c);
+    report(2); // serializing to JSON
     let json = serde_json::to_string(&replay).map_err(|e| format!("{e}"))?;
     let voice = build_voice_blob(&c);
     Ok((json, voice))
 }
 
+/// How many demo ticks between parse-progress callbacks (throttle). At 64 tps a
+/// 30-min demo is ~115k ticks, so this yields a couple hundred smooth updates.
+const PROGRESS_TICK_INTERVAL: u32 = 512;
+
 /// Shortcut that returns only the `Replay` JSON (used by the legacy native binary
 /// and by consumers that only want the gameplay).
 pub fn parse_replay(bytes: &[u8], frame_rate: u32) -> Result<String, String> {
-    parse_all(bytes, frame_rate).map(|(json, _)| json)
+    parse_all(bytes, frame_rate, |_, _, _| {}).map(|(json, _)| json)
 }
 
 // --------------------------------------------------------------- wasm api ----
@@ -1994,7 +2038,24 @@ impl ParseOutput {
 /// together with the voice blob. Throws an error string on failure.
 #[cfg(feature = "wasm")]
 #[wasm_bindgen]
-pub fn parse_demo(bytes: &[u8], frame_rate: u32) -> Result<ParseOutput, JsValue> {
-    let (replay, voice) = parse_all(bytes, frame_rate).map_err(|e| JsValue::from_str(&e))?;
+pub fn parse_demo(
+    bytes: &[u8],
+    frame_rate: u32,
+    on_progress: Option<js_sys::Function>,
+) -> Result<ParseOutput, JsValue> {
+    // Bridge the Rust progress callback to the optional JS function:
+    // `on_progress(stage, currentTick, totalTicks)`. stage 0 = parsing,
+    // 1 = building the replay, 2 = serializing.
+    let cb = move |stage: u32, cur: u32, total: u32| {
+        if let Some(f) = &on_progress {
+            let _ = f.call3(
+                &JsValue::NULL,
+                &JsValue::from_f64(stage as f64),
+                &JsValue::from_f64(cur as f64),
+                &JsValue::from_f64(total as f64),
+            );
+        }
+    };
+    let (replay, voice) = parse_all(bytes, frame_rate, cb).map_err(|e| JsValue::from_str(&e))?;
     Ok(ParseOutput { replay, voice })
 }

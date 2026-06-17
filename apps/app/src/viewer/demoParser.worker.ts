@@ -14,7 +14,7 @@ export interface ParseRequest {
 }
 
 export type ParseResponse =
-  | { type: 'progress'; phase: 'parsing' | 'building' }
+  | { type: 'progress'; phase: 'parsing' | 'building' | 'serializing'; tick?: number; totalTicks?: number }
   | { type: 'result'; ok: true; replay: unknown; voice: VoiceData }
   | { type: 'result'; ok: false; error: string }
 
@@ -74,12 +74,23 @@ self.onmessage = async (e: MessageEvent<ParseRequest>) => {
     // `buffer` is already the raw `.dem` (decompression happens earlier, in a
     // separate throwaway worker — see `useDemoParser`).
     const dem = new Uint8Array(buffer)
-    // The heavy WASM parse: report it before the (blocking) call so the UI can
-    // reflect the phase the worker is about to spend most of its time in.
+    // The parser reports real progress via this callback (same thread, but the
+    // posted messages reach the main thread live): stage 0 = parsing (per tick),
+    // 1 = building the replay, 2 = serializing.
+    const onProgress = (stage: number, tick: number, totalTicks: number) => {
+      if (stage === 0) {
+        self.postMessage({ type: 'progress', phase: 'parsing', tick, totalTicks } satisfies ParseResponse)
+      } else if (stage === 1) {
+        self.postMessage({ type: 'progress', phase: 'building' } satisfies ParseResponse)
+      } else {
+        self.postMessage({ type: 'progress', phase: 'serializing' } satisfies ParseResponse)
+      }
+    }
+    // Switch the label to "parsing" instantly, before the first tick is reported.
     self.postMessage({ type: 'progress', phase: 'parsing' } satisfies ParseResponse)
-    const out = parse_demo(dem, frameRate)
-    // Turning the parser's JSON string into the replay object (also heavy).
-    self.postMessage({ type: 'progress', phase: 'building' } satisfies ParseResponse)
+    const out = parse_demo(dem, frameRate, onProgress)
+    // JS-side finalization: turning the parser's big JSON string into objects.
+    self.postMessage({ type: 'progress', phase: 'serializing' } satisfies ParseResponse)
     const replay = JSON.parse(out.replay)
     const voice = parseVoiceBlob(out.voice)
     out.free()

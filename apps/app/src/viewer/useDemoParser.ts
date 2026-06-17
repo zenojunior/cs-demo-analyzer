@@ -3,20 +3,24 @@ import type { Replay, VoiceData } from '@/viewer/schema'
 import type { ParseResponse } from '@/viewer/demoParser.worker'
 import type { DecompressResponse } from '@/viewer/decompress.worker'
 
-/** Estados do ciclo de upload + parse de uma demo. */
+/** States of a demo's upload + parse cycle. */
 export type ParseStatus = 'idle' | 'reading' | 'parsing' | 'done' | 'error'
 
 /** Fine-grained step within the `reading`/`parsing` work, for the progress UI. */
-export type ParsePhase = 'reading' | 'decompressing' | 'parsing' | 'building'
+export type ParsePhase = 'reading' | 'decompressing' | 'parsing' | 'building' | 'serializing'
 
-/** Coarse progress (0..1) per phase — the steps are blocking, so within a phase
- * the bar holds; the label tells the user what the worker is doing. */
+/** Baseline progress (0..1) at the start of each phase. The `parsing` phase then
+ * fills smoothly from its baseline using the real tick fraction reported by the
+ * WASM parser; the other phases are quick, so the bar just snaps to their value. */
 const PHASE_PROGRESS: Record<ParsePhase, number> = {
   reading: 0.06,
   decompressing: 0.3,
-  parsing: 0.7,
-  building: 0.92,
+  parsing: 0.3,
+  building: 0.88,
+  serializing: 0.95,
 }
+/** The `parsing` phase fills this much of the bar (0.30 -> 0.85), driven by ticks. */
+const PARSE_BAND = 0.55
 
 /**
  * Takes a `.dem` file, reads its bytes and delegates parsing to a WebAssembly
@@ -33,10 +37,21 @@ export function useDemoParser() {
   const fileName = ref('')
   const fileSize = ref(0)
   const rawSize = ref(0) // decompressed `.dem` size in bytes (0 until known)
+  const parseTick = ref(0) // current demo tick during the `parsing` phase
+  const parseTotalTicks = ref(0) // total demo ticks (0 until the header is read)
 
   function setPhase(p: ParsePhase) {
     phase.value = p
     progress.value = PHASE_PROGRESS[p]
+  }
+
+  /** Updates the bar during the `parsing` phase from the real tick fraction. */
+  function setParseTicks(tick: number, total: number) {
+    phase.value = 'parsing'
+    parseTick.value = tick
+    parseTotalTicks.value = total
+    const frac = total > 0 ? Math.min(1, tick / total) : 0
+    progress.value = PHASE_PROGRESS.parsing + frac * PARSE_BAND
   }
 
   let worker: Worker | null = null
@@ -93,6 +108,8 @@ export function useDemoParser() {
     fileName.value = file.name
     fileSize.value = file.size
     rawSize.value = 0
+    parseTick.value = 0
+    parseTotalTicks.value = 0
     status.value = 'reading'
     setPhase('reading')
 
@@ -116,7 +133,11 @@ export function useDemoParser() {
       w.onmessage = (e: MessageEvent<ParseResponse>) => {
         const msg = e.data
         if (msg.type === 'progress') {
-          setPhase(msg.phase)
+          if (msg.phase === 'parsing' && msg.totalTicks) {
+            setParseTicks(msg.tick ?? 0, msg.totalTicks)
+          } else {
+            setPhase(msg.phase)
+          }
           return
         }
         if (msg.ok) {
@@ -139,7 +160,7 @@ export function useDemoParser() {
         worker = null
         resolve()
       }
-      // Transfere o buffer (zero-copy) para o worker.
+      // Transfer the buffer (zero-copy) to the worker.
       w.postMessage({ buffer: raw, frameRate: 8 }, [raw])
     })
   }
@@ -172,6 +193,8 @@ export function useDemoParser() {
     fileName.value = ''
     fileSize.value = 0
     rawSize.value = 0
+    parseTick.value = 0
+    parseTotalTicks.value = 0
   }
 
   onUnmounted(() => {
@@ -189,6 +212,8 @@ export function useDemoParser() {
     fileName,
     fileSize,
     rawSize,
+    parseTick,
+    parseTotalTicks,
     parse,
     hydrate,
     reset,

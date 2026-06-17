@@ -27,8 +27,20 @@ const PHASE_LABEL: Record<string, string> = {
   decompressing: 'analyzer.decompressing',
   parsing: 'analyzer.parsing',
   building: 'analyzer.building',
+  serializing: 'analyzer.serializing',
 }
 const phaseLabel = computed(() => t(PHASE_LABEL[parser.phase.value] ?? 'analyzer.parsing'))
+// Overall percentage shown next to the bar.
+const progressPct = computed(() => Math.round(parser.progress.value * 100))
+// During parsing, a "X / Y ticks" detail so the user sees real movement.
+const parseTickDetail = computed(() => {
+  const total = parser.parseTotalTicks.value
+  if (parser.phase.value !== 'parsing' || !total) return ''
+  return t('analyzer.parsingTicks', {
+    done: parser.parseTick.value.toLocaleString(),
+    total: total.toLocaleString(),
+  })
+})
 const recent = useRecentDemos()
 const dragging = ref(false)
 const input = ref<HTMLInputElement | null>(null)
@@ -277,17 +289,21 @@ function fmtDate(ms: number) {
             <template v-if="parser.rawSize.value"> → {{ fmtSize(parser.rawSize.value) }}</template>
           </span>
         </p>
+        <p v-if="!routeLoading && parseTickDetail" class="mt-1 font-mono text-xs text-ink-500">
+          {{ parseTickDetail }}
+        </p>
       </div>
 
-      <!-- Linear progress: fills by phase so the user (and we) can see which
-           step the worker is on, especially for big .zst demos. -->
+      <!-- Linear progress: real bar (tick-driven during parsing) so the user can
+           see actual movement, especially for big .zst demos. -->
       <div v-if="!routeLoading" class="w-full max-w-sm">
         <div class="h-1.5 w-full overflow-hidden rounded-full bg-ink-800">
           <div
-            class="h-full rounded-full bg-surge-400 transition-all duration-500 ease-out"
-            :style="{ width: `${Math.round(parser.progress.value * 100)}%` }"
+            class="h-full rounded-full bg-surge-400 transition-all duration-300 ease-out"
+            :style="{ width: `${progressPct}%` }"
           />
         </div>
+        <p class="mt-1.5 text-right font-mono text-xs text-ink-500">{{ progressPct }}%</p>
       </div>
 
       <p class="max-w-sm text-xs text-ink-500">

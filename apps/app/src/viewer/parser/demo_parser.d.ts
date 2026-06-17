@@ -30,21 +30,23 @@ export function init(): void;
  * Worker entry point: takes the `.dem` bytes and returns the `Replay` (JSON)
  * together with the voice blob. Throws an error string on failure.
  */
-export function parse_demo(bytes: Uint8Array, frame_rate: number): ParseOutput;
+export function parse_demo(bytes: Uint8Array, frame_rate: number, on_progress?: Function | null): ParseOutput;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_parseoutput_free: (a: number, b: number) => void;
-    readonly parse_demo: (a: number, b: number, c: number) => [number, number, number];
+    readonly parse_demo: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly parseoutput_replay: (a: number) => [number, number];
     readonly parseoutput_voice: (a: number) => [number, number];
     readonly init: () => void;
+    readonly __wbindgen_exn_store: (a: number) => void;
+    readonly __externref_table_alloc: () => number;
+    readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-    readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
