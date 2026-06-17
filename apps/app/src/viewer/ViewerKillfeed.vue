@@ -36,21 +36,9 @@ const colorOf = (id: string | null) =>
       :key="k.tick + '-' + i"
       class="flex items-center gap-1.5 rounded-md bg-ink-950/75 px-2 py-1 text-xs backdrop-blur"
     >
-      <!-- Assister (to the left of the attacker): flash assist shows the icon -->
-      <template v-if="k.assisterSteamId">
-        <span class="font-medium" :style="{ color: colorOf(k.assisterSteamId) }">
-          {{ nameOf(k.assisterSteamId) }}
-        </span>
-        <img
-          v-if="k.assistedFlash"
-          v-tooltip="t('viewer.flashAssist')"
-          src="/weapons/flash.svg"
-          alt="+"
-          class="h-3 w-3 opacity-90"
-        />
-        <span v-else class="text-ink-500">+</span>
-      </template>
-
+      <!-- Killer first, then assister (CS2 killfeed order): killer + assister.
+           The `+` (and a non-flash assist) take the team color — killer and
+           assister are always teammates. -->
       <span
         v-if="k.attackerSteamId"
         class="font-medium"
@@ -58,6 +46,20 @@ const colorOf = (id: string | null) =>
       >
         {{ nameOf(k.attackerSteamId) }}
       </span>
+
+      <template v-if="k.assisterSteamId">
+        <img
+          v-if="k.assistedFlash"
+          v-tooltip="t('viewer.flashAssist')"
+          src="/weapons/flash.svg"
+          alt="+"
+          class="h-3 w-3 opacity-90"
+        />
+        <span v-else class="font-medium" :style="{ color: colorOf(k.attackerSteamId) }">+</span>
+        <span class="font-medium" :style="{ color: colorOf(k.assisterSteamId) }">
+          {{ nameOf(k.assisterSteamId) }}
+        </span>
+      </template>
       <img
         v-if="killWeaponIcon(k.weapon)"
         :src="killWeaponIcon(k.weapon)!"
