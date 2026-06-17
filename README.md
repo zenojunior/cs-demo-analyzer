@@ -5,6 +5,8 @@ No install, no database, no Docker, no uploads: drop a `.dem` file and rewatch
 the match round by round. Everything is parsed locally on your machine, and not
 a single byte of the demo leaves your browser.
 
+![2D replay of a CS2 demo on de_dust2](apps/app/public/showcase.webp)
+
 ## Why
 
 I had been using other tools to analyze demos, but there was always a lot of
