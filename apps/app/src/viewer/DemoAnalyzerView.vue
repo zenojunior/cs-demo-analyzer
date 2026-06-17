@@ -74,16 +74,14 @@ function goTab(tab: Tab) {
 }
 
 // Landing-page ambient preview: rotates through a few maps, switching to the
-// next once each round finishes playing (see DemoPreviewLoop `@ended`).
-// Inferno is first on purpose: it is by far the smallest fixture and is
-// <link rel="preload">ed in index.html, so the first paint shows up fast on a
-// cold cache. The larger maps come in afterwards (cached by then on revisits).
+// next once each round finishes playing (see DemoPreviewLoop `@ended`). The
+// starting map is randomized so refreshes don't always open on the same one.
 const PREVIEWS = [
   '/replays/inferno-preview.json',
   '/replays/dust2-preview.json',
   '/replays/anubis-preview.json',
 ]
-const previewIndex = ref(0)
+const previewIndex = ref(Math.floor(Math.random() * PREVIEWS.length))
 const currentPreview = computed(() => PREVIEWS[previewIndex.value])
 function nextPreview() {
   previewIndex.value = (previewIndex.value + 1) % PREVIEWS.length
