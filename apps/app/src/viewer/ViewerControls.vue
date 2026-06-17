@@ -32,6 +32,8 @@ const props = defineProps<{
   balance?: number
   /** Per-team voice amplitude envelope (timeline waveform). */
   waveform?: { ct: number[]; t: number[] } | null
+  /** Demo tick rate (for freeze/post-round timeline math). */
+  demoTickRate?: number
   /** "Advanced" menu options (viewer behavior toggles). */
   advancedOptions?: { key: string; label: string; description?: string; enabled: boolean }[]
 }>()
@@ -70,6 +72,23 @@ const totalT = computed(() => {
   const f = props.round?.frames
   return f && f.length ? f[f.length - 1].t : 0
 })
+
+// Freeze/post-round boundaries on the round timeline, in seconds from t = 0
+// (freeze start). Fallback for replays parsed before these fields existed.
+const tickRate = computed(() => props.demoTickRate || 64)
+const freezeStartTick = computed(() => props.round?.freezeStartTick ?? props.round?.startTick ?? 0)
+const liveStartT = computed(() => {
+  const r = props.round
+  if (!r) return 0
+  return Math.max(0, (r.startTick - freezeStartTick.value) / tickRate.value)
+})
+const postStartT = computed(() => {
+  const r = props.round
+  if (!r) return totalT.value
+  return ((r.decidedTick ?? r.endTick) - freezeStartTick.value) / tickRate.value
+})
+/** Freeze duration (s), for the badge — only when there is a real freeze. */
+const freezeSeconds = computed(() => liveStartT.value)
 
 const markers = computed(() => buildTimelineMarkers(props.round))
 
@@ -200,6 +219,10 @@ onMounted(() => centerCurrent('auto'))
         :duration="totalT"
         :markers="markers"
         :waveform="waveform"
+        :live-start-t="liveStartT"
+        :post-start-t="postStartT"
+        :freeze-label="`${t('viewer.freeze')} · ${Math.round(freezeSeconds)}s`"
+        :round-end-label="t('viewer.roundEnd')"
         @seek="onSeek"
       />
 

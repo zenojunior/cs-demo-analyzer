@@ -8,7 +8,7 @@ export const SPEEDS = [1, 2, 4, 8] as const
 const ROUND_TIME = 115
 const BOMB_TIME = 40
 
-export type Clock = { phase: 'round' | 'bomb'; seconds: number }
+export type Clock = { phase: 'freeze' | 'round' | 'bomb'; seconds: number }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
@@ -72,16 +72,40 @@ export function useReplay() {
   })
 
   /**
-   * Tactical clock: counts the round time (1:55) down and, after the plant,
-   * switches to the 40s bomb timer. The frames' `t` is already post freeze time.
+   * Round timeline in seconds from `t = 0` (freeze start). Marks where the round
+   * goes live, when it was decided, the official end, and the total duration
+   * (which now spans freeze -> live -> post-round). Falls back gracefully for
+   * replays parsed before these fields existed (freeze/post collapse to 0).
+   */
+  const timeline = computed(() => {
+    const r = round.value
+    const tr = replay.value?.demoTickRate || 64
+    if (!r) return { liveStart: 0, decided: 0, roundEnd: 0, duration: 0 }
+    const fs = r.freezeStartTick ?? r.startTick
+    const liveStart = (r.startTick - fs) / tr
+    const decided = ((r.decidedTick ?? r.endTick) - fs) / tr
+    const roundEnd = (r.endTick - fs) / tr
+    const frames = r.frames
+    const duration = frames.length ? frames[frames.length - 1].t : roundEnd
+    return { liveStart, decided, roundEnd, duration }
+  })
+
+  /**
+   * Tactical clock: shows the freeze countdown during the buy period, then the
+   * round time (1:55) and, after the plant, the 40s bomb timer. `t = 0` is the
+   * start of freeze time, so the live round time is offset by `liveStart`.
    */
   const clock = computed<Clock>(() => {
     const t = currentT.value
+    const { liveStart } = timeline.value
+    if (t < liveStart) {
+      return { phase: 'freeze', seconds: Math.max(0, liveStart - t) }
+    }
     const pt = plantT.value
     if (pt !== null && t >= pt) {
       return { phase: 'bomb', seconds: Math.max(0, BOMB_TIME - (t - pt)) }
     }
-    return { phase: 'round', seconds: Math.max(0, ROUND_TIME - t) }
+    return { phase: 'round', seconds: Math.max(0, ROUND_TIME - (t - liveStart)) }
   })
 
   /**
@@ -163,11 +187,25 @@ export function useReplay() {
     frac.value = 0
   }
 
+  /** First frame at or after `t` seconds (binary-ish linear scan). */
+  function frameAtT(frames: Round['frames'], t: number): number {
+    if (t <= 0) return 0
+    for (let j = 0; j < frames.length; j++) {
+      if (frames[j].t >= t) return j
+    }
+    return Math.max(0, frames.length - 1)
+  }
+
   function selectRound(i: number) {
     if (!replay.value) return
-    roundIndex.value = Math.max(0, Math.min(i, replay.value.rounds.length - 1))
-    frameIndex.value = 0
+    const idx = Math.max(0, Math.min(i, replay.value.rounds.length - 1))
+    roundIndex.value = idx
     frac.value = 0
+    // Start at the live round (the freeze stays to the left, scrubbable).
+    const r = replay.value.rounds[idx]
+    const fs = r.freezeStartTick ?? r.startTick
+    const liveT = (r.startTick - fs) / (replay.value.demoTickRate || 64)
+    frameIndex.value = frameAtT(r.frames, liveT)
   }
 
   function seek(i: number) {
@@ -247,6 +285,7 @@ export function useReplay() {
     round,
     players,
     currentT,
+    timeline,
     clock,
     bombBlink,
     playersById,

@@ -9,12 +9,27 @@ const props = defineProps<{
   markers: TimelineMarker[]
   /** Per-team voice amplitude envelope (0..1 per column). */
   waveform?: { ct: number[]; t: number[] } | null
+  /** Seconds where the round goes live (end of freeze). Freeze = [0, liveStartT]. */
+  liveStartT?: number
+  /** Seconds where the post-round starts (round decided). Post = [postStartT, duration]. */
+  postStartT?: number
+  /** Tooltip for the freeze band (e.g. "Freeze · 20s"). */
+  freezeLabel?: string
+  /** Tooltip for the round-end mark. */
+  roundEndLabel?: string
 }>()
 
 const emit = defineEmits<{ seek: [fraction: number] }>()
 
 const frac = (t: number) => (props.duration > 0 ? Math.min(1, Math.max(0, t / props.duration)) : 0)
 const progress = computed(() => frac(props.currentT))
+
+// Freeze / post-round shaded bands (only when they have a visible width).
+const freezePct = computed(() => frac(props.liveStartT ?? 0) * 100)
+const postPct = computed(() => {
+  const start = frac(props.postStartT ?? props.duration)
+  return Math.max(0, (1 - start) * 100)
+})
 
 // --- Waveform: mirrored bars (CT up, T down) from the center.
 // viewBox in column units (width = number of bins, height 100, center at 50).
@@ -76,6 +91,32 @@ function leave() {
     @pointercancel="up"
     @pointerleave="leave"
   >
+    <!-- Freeze (buy) and post-round bands: dim the non-live phases so the live
+         round stands out. The freeze band carries the freeze-time tooltip. -->
+    <div
+      v-if="freezePct > 0.5"
+      v-tooltip="freezeLabel"
+      class="absolute inset-y-1 left-0 rounded-l-md bg-sky-500/12"
+      :style="{ width: freezePct + '%' }"
+    >
+      <div class="absolute inset-y-0 right-0 w-px bg-sky-400/40" />
+    </div>
+    <div
+      v-if="postPct > 0.5"
+      class="pointer-events-none absolute inset-y-1 right-0 rounded-r-md bg-ink-400/12"
+      :style="{ width: postPct + '%' }"
+    />
+
+    <!-- Round-end mark: where the round was decided (tooltip on hover). -->
+    <div
+      v-if="postStartT != null"
+      v-tooltip="roundEndLabel"
+      class="absolute inset-y-2 w-1.5 -translate-x-1/2 rounded-full"
+      :style="{ left: frac(postStartT) * 100 + '%' }"
+    >
+      <div class="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-ink-300/50" />
+    </div>
+
     <!-- Voice waveform (when comms exist): CT up, T down from the center.
          The played part is full color; the rest is faded. -->
     <template v-if="waveform && bars.length">

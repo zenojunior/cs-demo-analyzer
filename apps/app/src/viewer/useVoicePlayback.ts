@@ -143,12 +143,15 @@ export function useVoicePlayback(opts: VoicePlaybackOptions) {
     const map = new Map<string, number[]>()
     if (!r || !v) return map
     const tr = v.tickRate || 64
+    // Window spans freeze -> live -> post-round (with fallback for older replays).
+    const fs = r.freezeStartTick ?? r.startTick
+    const pe = r.postEndTick ?? r.endTick
     for (const track of v.tracks) {
       const offs: number[] = []
       let lastBucket = -1
       for (const p of track.packets) {
-        if (p.tick < r.startTick || p.tick > r.endTick) continue
-        const t = (p.tick - r.startTick) / tr
+        if (p.tick < fs || p.tick > pe) continue
+        const t = (p.tick - fs) / tr
         const bucket = Math.round(t * 5) // 0.2s buckets
         if (bucket !== lastBucket) {
           offs.push(t)
@@ -183,7 +186,11 @@ export function useVoicePlayback(opts: VoicePlaybackOptions) {
     const v = voice.value
     if (!r || !v) return null
     const tr = v.tickRate || 64
-    const dur = (r.endTick - r.startTick) / tr
+    // Full window (freeze -> live -> post-round) so the waveform aligns with the
+    // scrubber. Fallback for replays parsed before these fields existed.
+    const fs = r.freezeStartTick ?? r.startTick
+    const pe = r.postEndTick ?? r.endTick
+    const dur = (pe - fs) / tr
     if (dur <= 0) return null
     const n = WAVE_BINS
     const ctDb = new Float32Array(n).fill(-Infinity)
@@ -195,11 +202,11 @@ export function useVoicePlayback(opts: VoicePlaybackOptions) {
       if (side !== 'CT' && side !== 'T') continue
       const arr = side === 'CT' ? ctDb : tDb
       for (const p of track.packets) {
-        if (p.tick < r.startTick || p.tick > r.endTick) continue
+        if (p.tick < fs || p.tick > pe) continue
         const level = p.level
         if (level == null || level >= 0) continue // no valid voice_level
         any = true
-        const frac = (p.tick - r.startTick) / tr / dur
+        const frac = (p.tick - fs) / tr / dur
         const bin = Math.min(n - 1, Math.max(0, Math.floor(frac * n)))
         if (level > arr[bin]) arr[bin] = level
         if (level > maxDb) maxDb = level
@@ -223,22 +230,24 @@ export function useVoicePlayback(opts: VoicePlaybackOptions) {
     const audio = ensureCtx()
     const tr = tickRate.value
     const sr = sampleRate.value
-    const durSec = Math.max(0, (r.endTick - r.startTick) / tr)
+    // Window spans freeze -> live -> post-round (fallback for older replays), so
+    // freeze-time and post-round comms are decoded too.
+    const fs = r.freezeStartTick ?? r.startTick
+    const pe = r.postEndTick ?? r.endTick
+    const durSec = Math.max(0, (pe - fs) / tr)
     if (durSec <= 0) return
     const totalSamples = Math.ceil(durSec * sr)
 
     const result: PlayerVoice[] = []
     for (const track of voice.value.tracks) {
-      const pkts = track.packets.filter(
-        (p) => p.tick >= r.startTick && p.tick <= r.endTick,
-      )
+      const pkts = track.packets.filter((p) => p.tick >= fs && p.tick <= pe)
       if (!pkts.length) continue
 
       const pcm = new Float32Array(totalSamples)
       // Offset (in samples) of each packet's tick, in submission order. CS2's Opus
       // has 1 frame per packet, so the decoder emits 1 output per input, in order:
       // we match the n-th output to the n-th offset.
-      const offsets = pkts.map((p) => Math.floor(((p.tick - r.startTick) / tr) * sr))
+      const offsets = pkts.map((p) => Math.floor(((p.tick - fs) / tr) * sr))
       let outIdx = 0
       // Write cursor: several packets land on the same tick (voice is finer than the
       // 64Hz ticks), so we chain the frames of one continuous speech instead of

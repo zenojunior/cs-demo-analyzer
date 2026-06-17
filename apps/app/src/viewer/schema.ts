@@ -46,9 +46,20 @@ export interface PlayerMeta {
 export interface Round {
   /** Round number starting at 1 (in played order). */
   number: number
-  /** Tick when the round becomes playable (after freeze time). */
+  /** Freeze/buy-period start. The round timeline (`Frame.t` and every event's
+   * `t`) is measured from here, so `t = 0` is the start of freeze time. */
+  freezeStartTick: number
+  /** Tick when the round becomes playable (round goes live, after freeze time). */
   startTick: number
+  /** Tick when the round was decided (win-status flip). Between this and
+   * `endTick` is the post-round (reactions). Equals `endTick` when there is no
+   * distinct post-round in the demo. */
+  decidedTick: number
+  /** Official end of the round (round_officially_ended). */
   endTick: number
+  /** End of the round's playable window (start of the next round's freeze, or
+   * the last sampled tick for the final round). Covers the post-round period. */
+  postEndTick: number
   winner: RoundWinner
   /** Raw end reason code (`m_eRoundWinReason` from CS2). */
   reason: string | null
@@ -91,9 +102,9 @@ export interface GroundWeapon {
   y: number
   /** Height (Z axis), for the multi-floor level filter. */
   z: number
-  /** Seconds since the round `startTick` when it appears on the ground. */
+  /** Seconds since the round `freezeStartTick` when it appears on the ground. */
   startT: number
-  /** Seconds since the round `startTick` when it is picked up / the round ends. */
+  /** Seconds since the round `freezeStartTick` when it is picked up / the round ends. */
   endT: number
 }
 
@@ -103,9 +114,9 @@ export interface GroundWeapon {
  * animation stops at `endT` and disappears; if completed it reaches 100% at `endT`.
  */
 export interface Defuse {
-  /** Seconds since the round `startTick` when the defuse started. */
+  /** Seconds since the round `freezeStartTick` when the defuse started. */
   startT: number
-  /** Seconds since the round `startTick` when it stopped (done or aborted). */
+  /** Seconds since the round `freezeStartTick` when it stopped (done or aborted). */
   endT: number
   defused: boolean
   hasKit: boolean
@@ -114,7 +125,7 @@ export interface Defuse {
 
 /** In-game chat message typed by players. */
 export interface ChatMessage {
-  /** Seconds since the round `startTick` (clamped to >= 0). */
+  /** Seconds since the round `freezeStartTick` (clamped to >= 0). */
   t: number
   tick: number
   /** Sender name at the time of the message. */
@@ -161,7 +172,7 @@ export interface BombKeyframe {
 
 export interface Frame {
   tick: number
-  /** Seconds since the round `startTick`. */
+  /** Seconds since the round `freezeStartTick` (t = 0 is the start of freeze). */
   t: number
   players: PlayerState[]
 }
@@ -202,7 +213,7 @@ export type GameEventType =
 export interface BaseEvent {
   type: GameEventType
   tick: number
-  /** Seconds since the round `startTick`. */
+  /** Seconds since the round `freezeStartTick`. */
   t: number
 }
 
@@ -238,7 +249,7 @@ export interface GrenadeEvent extends BaseEvent {
   y: number
   /** Height (Z axis) of the detonation, for the heatmap level filter. */
   z: number
-  /** Effect end (seconds since the round `startTick`). For smoke/fire it comes
+  /** Effect end (seconds since the round `freezeStartTick`). For smoke/fire it comes
    *  from the expire pair; for he/flash it is a short fixed window. */
   endT: number
 }

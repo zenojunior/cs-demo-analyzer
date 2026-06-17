@@ -113,9 +113,11 @@ function fmtClock(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-// Red highlight: bomb planted or round ending (<= 10s).
+// Red highlight: bomb planted or live round ending (<= 10s). Never during freeze.
 const clockAlert = computed(
-  () => r.clock.value.phase === 'bomb' || r.clock.value.seconds <= 10,
+  () =>
+    r.clock.value.phase === 'bomb' ||
+    (r.clock.value.phase === 'round' && r.clock.value.seconds <= 10),
 )
 
 // Keyboard shortcuts: space toggles play/pause, arrows seek +/-5s in the round.
@@ -223,13 +225,25 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
             {{ r.score.value.CT }}
           </span>
 
-          <!-- Tactical clock: round time (1:55) or bomb time (40s) -->
+          <!-- Tactical clock: freeze (buy) time, round time (1:55) or bomb (40s) -->
           <div
             class="flex items-center gap-2 rounded-lg border bg-ink-900/80 px-4 py-1.5 backdrop-blur"
-            :class="clockAlert ? 'border-live/50' : 'border-ink-700'"
+            :class="
+              clockAlert
+                ? 'border-live/50'
+                : r.clock.value.phase === 'freeze'
+                  ? 'border-sky-500/40'
+                  : 'border-ink-700'
+            "
           >
             <span
-              v-if="r.clock.value.phase === 'bomb'"
+              v-if="r.clock.value.phase === 'freeze'"
+              class="text-[10px] font-semibold uppercase tracking-wide text-sky-300"
+            >
+              {{ t('viewer.freeze') }}
+            </span>
+            <span
+              v-else-if="r.clock.value.phase === 'bomb'"
               class="h-2.5 w-2.5 rounded-full bg-live transition-opacity duration-75"
               :class="r.bombBlink.value ? 'opacity-100 shadow-[0_0_6px_var(--color-live)]' : 'opacity-25'"
             />
@@ -241,7 +255,9 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
             />
             <span
               class="font-mono text-xl tabular-nums"
-              :class="clockAlert ? 'text-live' : 'text-ink-50'"
+              :class="
+                clockAlert ? 'text-live' : r.clock.value.phase === 'freeze' ? 'text-sky-200' : 'text-ink-50'
+              "
             >
               {{ fmtClock(r.clock.value.seconds) }}
             </span>
@@ -356,6 +372,7 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
           :master-volume="audio.masterVolume.value"
           :balance="audio.balance.value"
           :waveform="audio.roundWaveform.value"
+          :demo-tick-rate="r.replay.value.demoTickRate"
           @toggle="r.toggle"
           @seek="r.seek"
           @skip="r.seekBySeconds"

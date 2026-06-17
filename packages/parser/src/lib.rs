@@ -50,8 +50,19 @@ struct PlayerMeta {
 #[serde(rename_all = "camelCase")]
 struct Round {
     number: u32,
+    /// Freeze/buy-period start. The round timeline (frame/event `t`) is measured
+    /// from here, so `t = 0` is the start of freeze time.
+    freeze_start_tick: u32,
+    /// Playable start (round goes live, after freeze time).
     start_tick: u32,
+    /// Moment the round was decided (win-status flip). Between this and
+    /// `end_tick` is the post-round period (reactions / comms).
+    decided_tick: u32,
+    /// Official end of the round (round_officially_ended).
     end_tick: u32,
+    /// End of the round's window (start of the next round's freeze, or the last
+    /// sampled tick for the final round). Covers the post-round period.
+    post_end_tick: u32,
     winner: Option<String>,
     reason: Option<String>,
     score_ct: i32,
@@ -299,6 +310,9 @@ struct Collector {
     map_name: String,
     meta_order: Vec<String>,
     meta: HashMap<String, PlayerMeta>,
+    /// Freeze-time start of each round (`round_start`, outside warmup). The buy
+    /// period runs from here to the matching `freeze_ends` tick.
+    round_starts: Vec<u32>,
     /// Playable start of each round (outside warmup).
     freeze_ends: Vec<u32>,
     /// Official round end: (tick, winner, reason) read from the game rules.
@@ -933,6 +947,12 @@ impl Collector {
         }
 
         match ge.name() {
+            "round_start" => {
+                // Freeze/buy period begins. Ignore warmup (not a match round).
+                if !in_warmup(ctx) {
+                    self.round_starts.push(tick);
+                }
+            }
             "round_freeze_end" => {
                 // Ignore warmup freezes (they are not match rounds).
                 if !in_warmup(ctx) {
@@ -1127,8 +1147,12 @@ fn build_replay(c: &Collector) -> Replay {
         let (ct_name, t_name) = c.round_names.get(&start).cloned().unwrap_or_default();
         Round {
             number,
+            // Filled in by a second pass below (needs round_starts / the next round).
+            freeze_start_tick: start,
             start_tick: start,
+            decided_tick: end_tick,
             end_tick,
+            post_end_tick: end_tick,
             winner,
             reason,
             score_ct,
@@ -1176,16 +1200,152 @@ fn build_replay(c: &Collector) -> Replay {
         ));
     }
 
+    // Widen each round to cover its freeze time and post-round:
+    //  - freeze_start = the `round_start` just before the playable start (the buy
+    //    period). Falls back to the previous round's end (or 0) if missing.
+    //  - post_end = the next round's freeze_start (so the gap after the round ends
+    //    — the post-round — belongs to this round). The last round runs to the
+    //    last sampled tick.
+    let mut starts = c.round_starts.clone();
+    starts.sort_unstable();
+    // Win-status flips give the exact moment each round was decided (the
+    // post-round runs from there to the official end).
+    let mut decided: Vec<u32> = c.synth_ends.iter().map(|e| e.0).collect();
+    decided.sort_unstable();
+    // Knife round (FACEIT/scrim opener): every sampled player holds only a knife
+    // (or nothing) for the whole live round. There is no buy, so we collapse the
+    // freeze window — otherwise the long warmup gap before it shows as a huge
+    // freeze. (The viewer also detects this to label the round "0".)
+    let is_knife_round = |start_tick: u32, end_tick: u32| -> bool {
+        let mut saw_player = false;
+        for f in &c.frames {
+            if f.tick < start_tick || f.tick > end_tick {
+                continue;
+            }
+            for p in &f.players {
+                saw_player = true;
+                if p.weapon != "Faca" && !p.weapon.is_empty() {
+                    return false;
+                }
+            }
+        }
+        saw_player
+    };
+    let mut prev_end = 0u32;
+    for r in &mut rounds {
+        let fs = starts
+            .iter()
+            .rev()
+            .find(|&&s| s <= r.start_tick && s >= prev_end)
+            .copied()
+            .unwrap_or_else(|| prev_end.min(r.start_tick));
+        // Cap the freeze window (~50s: a 30s tactical timeout + buy time) so a
+        // halftime or tech-pause gap doesn't pull in minutes of audio/frames.
+        let freeze_cap = r.start_tick.saturating_sub(50 * DEMO_TICK_RATE as u32);
+        r.freeze_start_tick = if is_knife_round(r.start_tick, r.end_tick) {
+            r.start_tick
+        } else {
+            fs.max(freeze_cap)
+        };
+        // The decision tick inside this round's live window (fallback: end_tick,
+        // i.e. no separate post-round segment).
+        r.decided_tick = decided
+            .iter()
+            .find(|&&d| d > r.start_tick && d <= r.end_tick)
+            .copied()
+            .unwrap_or(r.end_tick);
+        prev_end = r.end_tick;
+    }
+    for i in 0..rounds.len() {
+        rounds[i].post_end_tick = if i + 1 < rounds.len() {
+            rounds[i + 1].freeze_start_tick
+        } else {
+            last_tick.max(rounds[i].end_tick) + 1
+        };
+    }
+
+    // Carve a standalone knife round out of round 1's freeze window. FACEIT/scrim
+    // openers run the knife round in warmup, so it never becomes a round of its
+    // own and gets swallowed by the first round's (now visible) freeze. If that
+    // window opens with a long knife-only stretch followed by the real buy
+    // (pistols), split it off as its own round 0.
+    let knife_split = rounds.first().and_then(|r0| {
+        let (win_start, win_end) = (r0.freeze_start_tick, r0.start_tick);
+        let (ct_name, t_name) = (r0.ct_name.clone(), r0.t_name.clone());
+        let mut knife_lo: Option<u32> = None;
+        let mut knife_hi = win_start;
+        let mut pistol_start: Option<u32> = None;
+        for f in &c.frames {
+            if f.tick < win_start || f.tick >= win_end || pistol_start.is_some() {
+                continue;
+            }
+            let armed = f
+                .players
+                .iter()
+                .any(|p| p.weapon != "Faca" && !p.weapon.is_empty());
+            if armed {
+                // Real weapons appeared: the knife round is over (if one was seen).
+                if knife_lo.is_some() {
+                    pistol_start = Some(f.tick);
+                }
+            } else if !f.players.is_empty() {
+                // Knife-only frame (players present, none armed).
+                knife_lo.get_or_insert(f.tick);
+                knife_hi = f.tick;
+            }
+        }
+        match (knife_lo, pistol_start) {
+            (Some(klo), Some(pstart))
+                if knife_hi.saturating_sub(klo) >= 6 * DEMO_TICK_RATE as u32 =>
+            {
+                Some((klo, pstart, ct_name, t_name))
+            }
+            _ => None,
+        }
+    });
+    if let Some((klo, pstart, ct_name, t_name)) = knife_split {
+        // Round 1's freeze now starts at the real buy (after the knife round).
+        rounds[0].freeze_start_tick = pstart;
+        rounds.insert(
+            0,
+            Round {
+                number: 0,
+                freeze_start_tick: klo,
+                start_tick: klo,
+                decided_tick: pstart,
+                end_tick: pstart,
+                post_end_tick: pstart,
+                winner: None,
+                reason: None,
+                score_ct: 0,
+                score_t: 0,
+                ct_name,
+                t_name,
+                damage: HashMap::new(),
+                frames: Vec::new(),
+                events: Vec::new(),
+                bomb: Vec::new(),
+                grenade_paths: Vec::new(),
+                blinds: Vec::new(),
+                chat: Vec::new(),
+                defuses: Vec::new(),
+                ground_weapons: Vec::new(),
+            },
+        );
+    }
+
+    // A tick belongs to the round whose [freeze_start, post_end) window contains
+    // it (half-open so the boundary tick is not claimed by two rounds).
     let round_of = |tick: u32, rounds: &[Round]| -> Option<usize> {
         rounds
             .iter()
-            .position(|r| tick >= r.start_tick && tick <= r.end_tick)
+            .position(|r| tick >= r.freeze_start_tick && tick < r.post_end_tick)
     };
 
     // Distribute frames.
     for rf in &c.frames {
         if let Some(idx) = round_of(rf.tick, &rounds) {
-            let start = rounds[idx].start_tick;
+            let start = rounds[idx].freeze_start_tick;
             let players = rf
                 .players
                 .iter()
@@ -1227,7 +1387,7 @@ fn build_replay(c: &Collector) -> Replay {
             Some(i) => i,
             None => continue,
         };
-        let start = rounds[idx].start_tick;
+        let start = rounds[idx].freeze_start_tick;
         let t = round1((tick as f64 - start as f64) / DEMO_TICK_RATE);
         match ev {
             RawEvent::Kill {
@@ -1314,7 +1474,7 @@ fn build_replay(c: &Collector) -> Replay {
             Some(i) => i,
             None => continue,
         };
-        let start = rounds[idx].start_tick;
+        let start = rounds[idx].freeze_start_tick;
         let t = round1((tick as f64 - start as f64) / DEMO_TICK_RATE);
         let end_t = if matches!(kind, GrenadeKind::Smoke | GrenadeKind::Fire) {
             // First free end with the same entityid right after the detonation. The
@@ -1350,7 +1510,7 @@ fn build_replay(c: &Collector) -> Replay {
     // Shot tracers.
     for &(tick, x, y, yaw) in &c.shots {
         if let Some(idx) = round_of(tick, &rounds) {
-            let start = rounds[idx].start_tick;
+            let start = rounds[idx].freeze_start_tick;
             rounds[idx].events.push(Event::Shot {
                 tick,
                 t: round1((tick as f64 - start as f64) / DEMO_TICK_RATE),
@@ -1365,7 +1525,7 @@ fn build_replay(c: &Collector) -> Replay {
     for &(tick, uid, dur) in &c.blinds_raw {
         if let Some(idx) = round_of(tick, &rounds) {
             if let Some(steam) = c.userid_to_steam.get(&uid) {
-                let start = rounds[idx].start_tick;
+                let start = rounds[idx].freeze_start_tick;
                 rounds[idx].blinds.push(Blind {
                     t: round1((tick as f64 - start as f64) / DEMO_TICK_RATE),
                     duration: round1(dur),
@@ -1411,7 +1571,7 @@ fn build_replay(c: &Collector) -> Replay {
         if end_tick <= *btick {
             continue;
         }
-        let start = rounds[idx].start_tick;
+        let start = rounds[idx].freeze_start_tick;
         rounds[idx].defuses.push(Defuse {
             start_t: round1((*btick as f64 - start as f64) / DEMO_TICK_RATE),
             end_t: round1((end_tick as f64 - start as f64) / DEMO_TICK_RATE),
@@ -1436,7 +1596,7 @@ fn build_replay(c: &Collector) -> Replay {
             Some(i) => i,
             None => continue,
         };
-        let start = rounds[idx].start_tick;
+        let start = rounds[idx].freeze_start_tick;
         let t = round1(((*tick as f64 - start as f64) / DEMO_TICK_RATE).max(0.0));
         rounds[idx].chat.push(ChatMsg {
             t,
@@ -1480,7 +1640,7 @@ fn build_replay(c: &Collector) -> Replay {
         if same {
             continue;
         }
-        let start = rounds[idx].start_tick;
+        let start = rounds[idx].freeze_start_tick;
         let t = round1((*tick as f64 - start as f64) / DEMO_TICK_RATE);
         let kf = match sample {
             C4Sample::Carried(s) => BombKeyframe {
@@ -1527,9 +1687,10 @@ fn build_replay(c: &Collector) -> Replay {
             Some(i) => i,
             None => return,
         };
-        let start = rounds[idx].start_tick;
-        let round_end = rounds[idx].end_tick;
-        // Linger one sample past the last sighting, clamped to the round end.
+        let start = rounds[idx].freeze_start_tick;
+        // Clamp to the end of the round's window (includes the post-round), so a
+        // dropped weapon lingers as long as the round is shown.
+        let round_end = rounds[idx].post_end_tick;
         let end_tick = (last_tick + gw_gap).min(round_end).max(start_tick);
         rounds[idx].ground_weapons.push(GroundWeapon {
             label: label.to_string(),
@@ -1633,7 +1794,7 @@ fn build_replay(c: &Collector) -> Replay {
             Some(i) => i,
             None => continue,
         };
-        let start = rounds[idx].start_tick;
+        let start = rounds[idx].freeze_start_tick;
         let points = flight
             .iter()
             .map(|&(tk, x, y)| GrenadePoint {
