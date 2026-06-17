@@ -69,9 +69,11 @@ export function useVoicePlayback(opts: VoicePlaybackOptions) {
   const enabled = ref(false)
   /** CT<->T balance: -1 = CT only, 0 = both at 100%, +1 = T only. */
   const balance = ref(0)
-  /** Master comms volume (0 to 1), exposed in the player transport. */
-  const masterVolume = ref(1)
-  /** Last non-zero volume, restored when unmuting. */
+  /** Master comms volume (0 to 1), exposed in the player transport. Starts at 0
+   *  so the default state is consistently muted (comms are off until a gesture);
+   *  unmuting restores `lastVolume`. */
+  const masterVolume = ref(0)
+  /** Volume restored when unmuting (the last non-zero level). */
   const lastVolume = ref(1)
   /** Muted = audio off or volume at zero (to the user, the two are the same). */
   const muted = computed(() => !enabled.value || masterVolume.value <= 0)
