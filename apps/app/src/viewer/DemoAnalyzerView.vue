@@ -5,6 +5,7 @@ import UiIcon from '@/ui/UiIcon.vue'
 import ViewerStage from '@/viewer/ViewerStage.vue'
 import HeatmapView from '@/viewer/HeatmapView.vue'
 import GrenadesView from '@/viewer/GrenadesView.vue'
+import EconomyView from '@/viewer/EconomyView.vue'
 import DemoPreviewLoop from '@/viewer/DemoPreviewLoop.vue'
 import { useDemoParser } from '@/viewer/useDemoParser'
 import { useRecentDemos, type RecentDemo } from '@/viewer/useRecentDemos'
@@ -50,17 +51,23 @@ const loadingId = ref<string | null>(null)
 const routeLoading = ref(false)
 // Id of the currently open demo (avoids reloading when navigating to itself).
 const currentId = ref<string | null>(null)
-type Tab = 'viewer' | 'heatmap' | 'grenades'
+type Tab = 'viewer' | 'heatmap' | 'grenades' | 'economy'
 // The active tab is driven by the URL: `/:id` is the 2D stage, `/:id/heatmaps`
-// the heatmap, `/:id/grenades` the grenades page.
+// the heatmap, `/:id/grenades` the grenades page, `/:id/economy` the economy page.
 const activeTab = computed<Tab>(() => {
   const raw = route.params.tab
   const tab = Array.isArray(raw) ? raw[0] : raw
   if (tab === 'heatmaps') return 'heatmap'
   if (tab === 'grenades') return 'grenades'
+  if (tab === 'economy') return 'economy'
   return 'viewer'
 })
-const TAB_SEGMENT: Record<Tab, string> = { viewer: '', heatmap: '/heatmaps', grenades: '/grenades' }
+const TAB_SEGMENT: Record<Tab, string> = {
+  viewer: '',
+  heatmap: '/heatmaps',
+  grenades: '/grenades',
+  economy: '/economy',
+}
 function goTab(tab: Tab) {
   const id = currentId.value
   if (id) router.push(`/${id}${TAB_SEGMENT[tab]}`)
@@ -238,6 +245,7 @@ function fmtDate(ms: number) {
         :current-round-index="stageRoundIndex"
         @jump="onGrenadeJump"
       />
+      <EconomyView v-if="activeTab === 'economy'" :replay="parser.replay.value" />
 
       <!-- Tabs (2D / Heatmaps / Grenades) in the center of the appbar -->
       <Teleport to="#publicbar-center">
@@ -265,6 +273,14 @@ function fmtDate(ms: number) {
             @click="goTab('grenades')"
           >
             {{ t('tabs.grenades') }}
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors"
+            :class="activeTab === 'economy' ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
+            @click="goTab('economy')"
+          >
+            {{ t('tabs.economy') }}
           </button>
         </div>
       </Teleport>
