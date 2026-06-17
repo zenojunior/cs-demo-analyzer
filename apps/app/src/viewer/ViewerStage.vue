@@ -375,7 +375,6 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
           :demo-tick-rate="r.replay.value.demoTickRate"
           @toggle="r.toggle"
           @seek="r.seek"
-          @skip="r.seekBySeconds"
           @select-round="r.selectRound"
           @set-speed="(s) => (r.speed.value = s)"
           @toggle-mute="audio.toggleMute"

@@ -41,9 +41,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggle: []
   seek: [index: number]
-  skip: [seconds: number]
   selectRound: [index: number]
   setSpeed: [speed: number]
+  // Note: ±5s skip lives on the keyboard and context menu, not in this bar.
   toggleMute: []
   setMasterVolume: [value: number]
   setBalance: [value: number]
@@ -291,28 +291,14 @@ onMounted(() => centerCurrent('auto'))
     <!-- Transport -->
     <div class="flex items-center gap-3">
       <div class="flex shrink-0 items-center gap-1">
-        <button
-          v-tooltip="`${t('viewer.back5')} (←)`"
-          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-ink-200 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-          @click="emit('skip', -5)"
-        >
-          <UiIcon name="rotate-ccw" class="h-4 w-4" />
-        </button>
-
+        <!-- Play/pause only: ±5s skip stays on the keyboard (←/→) and the
+             context menu, to keep the transport compact. -->
         <button
           v-tooltip="`${playing ? t('viewer.pause') : t('viewer.play')} (${t('viewer.space')})`"
           class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-50 transition-colors duration-150 hover:bg-white/10"
           @click="emit('toggle')"
         >
           <UiIcon :name="playing ? 'pause' : 'play'" class="h-5 w-5" />
-        </button>
-
-        <button
-          v-tooltip="`${t('viewer.fwd5')} (→)`"
-          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-ink-200 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-          @click="emit('skip', 5)"
-        >
-          <UiIcon name="rotate-cw" class="h-4 w-4" />
         </button>
       </div>
 
