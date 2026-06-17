@@ -171,13 +171,28 @@ const pistolRounds = computed<Set<number>>(() => {
   return out
 })
 
-/** Pauses grouped by the round whose window contains each pause's start. */
+/**
+ * Round a pause belongs to: the one whose buy (freeze) it extends. A tactical
+ * timeout / tech pause is the *next* round's prolonged buy time, so it is anchored
+ * to the round whose [freezeStart, startTick) it overlaps, not the previous round
+ * whose post-round its start tick happens to fall in. Falls back to the round that
+ * contains the start tick when it overlaps no freeze.
+ */
+function anchorRound(p: Pause): number {
+  const byFreeze = props.rounds.findIndex(
+    (r) => p.startTick < r.startTick && p.endTick > (r.freezeStartTick ?? r.startTick),
+  )
+  if (byFreeze >= 0) return byFreeze
+  return props.rounds.findIndex(
+    (r) => p.startTick >= (r.freezeStartTick ?? r.startTick) && p.startTick < r.postEndTick,
+  )
+}
+
+/** Pauses grouped by the round whose buy they extend. */
 const roundPauses = computed<Map<number, Pause[]>>(() => {
   const map = new Map<number, Pause[]>()
   for (const p of props.pauses ?? []) {
-    const i = props.rounds.findIndex(
-      (r) => p.startTick >= (r.freezeStartTick ?? r.startTick) && p.startTick < r.postEndTick,
-    )
+    const i = anchorRound(p)
     if (i < 0) continue
     const arr = map.get(i) ?? []
     arr.push(p)
@@ -204,6 +219,7 @@ const pauseBands = computed(() => {
   const dur = totalT.value
   const bands: { startT: number; endT: number; label: string }[] = []
   for (const p of props.pauses ?? []) {
+    if (anchorRound(p) !== props.roundIndex) continue
     const startT = Math.max(0, (p.startTick - fs) / tickRate.value)
     const endT = Math.min(dur, (p.endTick - fs) / tickRate.value)
     if (endT <= startT || startT >= dur) continue
