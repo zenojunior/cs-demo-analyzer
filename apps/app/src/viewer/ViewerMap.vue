@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { GrenadePath, PlayerMeta, PlayerState, Round, Side } from '@/viewer/schema'
-import { worldToFraction, type MapCalibration } from './calibration'
+import { worldToFraction, DEFAULT_BLAST_RADIUS, type MapCalibration } from './calibration'
 import { SIDE_COLOR } from './colors'
 import { WEAPON_LABELS, weaponIconPath } from './weaponIcons'
 import { useI18n } from '@/i18n'
@@ -38,6 +38,7 @@ const KILL_FADE = 1.4
 const SHOT_FADE = 0.12 // seconds the tracer stays visible
 const SHOT_LEN = 1400 // tracer length in game units
 const PLANT_TIME = 3.2 // C4 plant duration (s), animated before bomb_planted
+const BLAST_TIME = 0.8 // C4 explosion shockwave duration (s)
 
 const wrap = ref<HTMLDivElement | null>(null)
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -427,6 +428,54 @@ function drawBombIcon(sx: number, sy: number, boxH: number, planted: boolean) {
   ctx.restore()
 }
 
+/** C4 detonation: a shockwave that expands to the lethal blast radius in under a
+ *  second. A bright flash kicks it off, then an orange ring races outward (ease-out)
+ *  while a hot core fades behind it. */
+function drawBlast(wx: number, wy: number, startT: number, t: number) {
+  if (!ctx) return
+  const age = t - startT
+  if (age < 0 || age > BLAST_TIME) return
+  const { x, y } = w2s(wx, wy)
+  const p = age / BLAST_TIME
+  const ease = 1 - (1 - p) * (1 - p) // ease-out: fast then settling
+  const maxR = unitsToScreen(props.calibration.blastRadius ?? DEFAULT_BLAST_RADIUS)
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+
+  // Initial flash: a quick white burst over the first ~25% of the effect.
+  if (p < 0.25) {
+    const fk = p / 0.25
+    ctx.globalAlpha = (1 - fk) * 0.85
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, maxR * 0.6)
+    grad.addColorStop(0, 'rgba(255, 250, 235, 1)')
+    grad.addColorStop(1, 'rgba(255, 180, 80, 0)')
+    ctx.fillStyle = grad
+    ctx.beginPath()
+    ctx.arc(x, y, maxR * 0.6, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Hot core trailing behind the ring, fading as it spreads.
+  ctx.globalAlpha = (1 - p) * 0.5
+  const core = ctx.createRadialGradient(x, y, 0, x, y, maxR * ease)
+  core.addColorStop(0, 'rgba(255, 140, 40, 0.7)')
+  core.addColorStop(0.7, 'rgba(255, 90, 30, 0.25)')
+  core.addColorStop(1, 'rgba(255, 70, 20, 0)')
+  ctx.fillStyle = core
+  ctx.beginPath()
+  ctx.arc(x, y, maxR * ease, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Leading shockwave ring.
+  ctx.globalAlpha = 1 - ease
+  ctx.strokeStyle = '#ffcf6b'
+  ctx.lineWidth = clamp((1 - p) * 4, 1, 4)
+  ctx.beginPath()
+  ctx.arc(x, y, maxR * ease, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.restore()
+}
+
 /** Plant animation: a progress ring (0..1) around the planter circle (radius `r`
  *  follows the zoom). Drawn on top of the player. */
 function drawPlanting(sx: number, sy: number, r: number, p: number) {
@@ -753,6 +802,13 @@ function draw() {
   // dead first, alive on top
   for (const p of props.players) if (!p.alive || deaths.has(p.steamId)) drawPlayer(p, deaths.get(p.steamId))
   for (const p of props.players) if (p.alive && !deaths.has(p.steamId)) drawPlayer(p, undefined)
+
+  // C4 detonation shockwave (on top of players, at the plant position).
+  const blastEv = props.round?.events.find((e) => e.type === 'bomb_exploded')
+  if (blastEv) {
+    const pk = props.round?.bomb.find((k) => k.state === 'planted')
+    if (pk && pk.x != null) drawBlast(pk.x, pk.y ?? 0, blastEv.t, t)
+  }
 
   // Plant in progress: progress ring around the planter (on top of everything,
   // so it stays visible at any zoom). Falls back to the plant position if the

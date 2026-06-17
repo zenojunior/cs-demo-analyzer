@@ -9,7 +9,7 @@ export const SPEEDS = [1, 2, 4, 8] as const
 const ROUND_TIME = 115
 const BOMB_TIME = 40
 
-export type Clock = { phase: 'freeze' | 'round' | 'bomb'; seconds: number }
+export type Clock = { phase: 'freeze' | 'round' | 'bomb' | 'paused' | 'post'; seconds: number }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
@@ -37,6 +37,12 @@ export function useReplay() {
   const speed = ref<number>(1)
   /** When set, reaching the end of a round rolls straight into the next one. */
   const autoAdvance = useLocalStorage('viewer.advanced.autoAdvance', false)
+  /**
+   * When set, switching rounds starts right after the freeze time instead of
+   * playing it. Handy for matches without comms (e.g. majors), where the buy
+   * period has nothing to watch. The freeze still stays scrubbable to the left.
+   */
+  const skipFreeze = useLocalStorage('viewer.advanced.skipFreeze', false)
 
   const round = computed<Round | null>(() => replay.value?.rounds[roundIndex.value] ?? null)
   const frameCount = computed(() => round.value?.frames.length ?? 0)
@@ -74,6 +80,12 @@ export function useReplay() {
     return ev ? ev.t : null
   })
 
+  /** Actual explosion time (s) in the current round, if the bomb went off. */
+  const explodeT = computed(() => {
+    const ev = round.value?.events.find((e) => e.type === 'bomb_exploded')
+    return ev ? ev.t : null
+  })
+
   /**
    * Round timeline in seconds from `t = 0` (freeze start). Marks where the round
    * goes live, when it was decided, the official end, and the total duration
@@ -100,13 +112,39 @@ export function useReplay() {
    */
   const clock = computed<Clock>(() => {
     const t = currentT.value
-    const { liveStart } = timeline.value
+    const { liveStart, decided, roundEnd } = timeline.value
+    // Paused: during a tactical timeout / tech pause the game clock is frozen, so
+    // show "paused" instead of a running timer. The current absolute tick is the
+    // round's freeze start plus the elapsed round time.
+    const r = round.value
+    const pauses = replay.value?.pauses
+    if (r && pauses?.length) {
+      const fs = r.freezeStartTick ?? r.startTick
+      const tick = fs + t * (replay.value?.demoTickRate || 64)
+      if (pauses.some((p) => tick >= p.startTick && tick < p.endTick)) {
+        return { phase: 'paused', seconds: 0 }
+      }
+    }
     if (t < liveStart) {
       return { phase: 'freeze', seconds: Math.max(0, liveStart - t) }
     }
+    // Post-round: once the round is decided (bomb blew, defuse, last kill) the game
+    // keeps running for a few seconds before the side switch / next freeze. Count
+    // down to the official round end instead of holding a red 0:00. The bomb's
+    // explosion is what decides those rounds, so its tick starts this phase.
+    const xt = explodeT.value
+    const postStart = xt !== null ? xt : decided
+    if (t >= postStart) {
+      return { phase: 'post', seconds: Math.max(0, roundEnd - t) }
+    }
     const pt = plantT.value
     if (pt !== null && t >= pt) {
-      return { phase: 'bomb', seconds: Math.max(0, BOMB_TIME - (t - pt)) }
+      // Anchor the countdown to the real explosion tick when the bomb went off,
+      // so 0:00 lands exactly on the detonation (the demo's plant->explosion gap
+      // isn't precisely BOMB_TIME). Fall back to the theoretical 40s otherwise
+      // (defused / round ended before it blew).
+      const seconds = xt !== null ? Math.max(0, xt - t) : Math.max(0, BOMB_TIME - (t - pt))
+      return { phase: 'bomb', seconds }
     }
     return { phase: 'round', seconds: Math.max(0, ROUND_TIME - (t - liveStart)) }
   })
@@ -206,16 +244,20 @@ export function useReplay() {
     return Math.max(0, frames.length - 1)
   }
 
+  /** Frame index where the round goes live (right after the freeze time). */
+  function liveFrame(r: Round): number {
+    const fs = r.freezeStartTick ?? r.startTick
+    const liveT = (r.startTick - fs) / (replay.value?.demoTickRate || 64)
+    return frameAtT(r.frames, liveT)
+  }
+
   function selectRound(i: number) {
     if (!replay.value) return
     const idx = Math.max(0, Math.min(i, replay.value.rounds.length - 1))
     roundIndex.value = idx
     frac.value = 0
     // Start at the live round (the freeze stays to the left, scrubbable).
-    const r = replay.value.rounds[idx]
-    const fs = r.freezeStartTick ?? r.startTick
-    const liveT = (r.startTick - fs) / (replay.value.demoTickRate || 64)
-    frameIndex.value = frameAtT(r.frames, liveT)
+    frameIndex.value = liveFrame(replay.value.rounds[idx])
   }
 
   function seek(i: number) {
@@ -259,9 +301,11 @@ export function useReplay() {
     if (pos >= frameCount.value - 1) {
       const lastRound = replay.value ? replay.value.rounds.length - 1 : 0
       if (autoAdvance.value && roundIndex.value < lastRound) {
-        // Start at frame 0 so the freeze time plays too (don't skip to "live").
+        const next = replay.value!.rounds[roundIndex.value + 1]
         roundIndex.value = roundIndex.value + 1
-        frameIndex.value = 0
+        // With skipFreeze on, jump past the freeze time; otherwise start at
+        // frame 0 so the freeze plays too.
+        frameIndex.value = skipFreeze.value ? liveFrame(next) : 0
         frac.value = 0
         last = 0 // reset timing so the gap between rounds isn't counted as elapsed
         raf = requestAnimationFrame(tick)
@@ -304,6 +348,7 @@ export function useReplay() {
     playing,
     speed,
     autoAdvance,
+    skipFreeze,
     round,
     players,
     currentT,

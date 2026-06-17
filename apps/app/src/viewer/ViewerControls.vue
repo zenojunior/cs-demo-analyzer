@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { onClickOutside } from '@vueuse/core'
-import type { Round, Side } from '@/viewer/schema'
+import type { Pause, Round, Side } from '@/viewer/schema'
 import UiIcon from '@/ui/UiIcon.vue'
 import UiSwitch from '@/ui/UiSwitch.vue'
 import ViewerTimeline from './ViewerTimeline.vue'
@@ -34,6 +34,8 @@ const props = defineProps<{
   waveform?: { ct: number[]; t: number[] } | null
   /** Demo tick rate (for freeze/post-round timeline math). */
   demoTickRate?: number
+  /** Match pauses (tactical timeouts / tech pauses), in absolute ticks. */
+  pauses?: Pause[]
   /** "Advanced" menu options (viewer behavior toggles). */
   advancedOptions?: { key: string; label: string; description?: string; enabled: boolean }[]
 }>()
@@ -169,6 +171,63 @@ const pistolRounds = computed<Set<number>>(() => {
   return out
 })
 
+/**
+ * Round a pause belongs to: the one whose buy (freeze) it extends. A tactical
+ * timeout / tech pause is the *next* round's prolonged buy time, so it is anchored
+ * to the round whose [freezeStart, startTick) it overlaps, not the previous round
+ * whose post-round its start tick happens to fall in. Falls back to the round that
+ * contains the start tick when it overlaps no freeze.
+ */
+function anchorRound(p: Pause): number {
+  const byFreeze = props.rounds.findIndex(
+    (r) => p.startTick < r.startTick && p.endTick > (r.freezeStartTick ?? r.startTick),
+  )
+  if (byFreeze >= 0) return byFreeze
+  return props.rounds.findIndex(
+    (r) => p.startTick >= (r.freezeStartTick ?? r.startTick) && p.startTick < r.postEndTick,
+  )
+}
+
+/** Pauses grouped by the round whose buy they extend. */
+const roundPauses = computed<Map<number, Pause[]>>(() => {
+  const map = new Map<number, Pause[]>()
+  for (const p of props.pauses ?? []) {
+    const i = anchorRound(p)
+    if (i < 0) continue
+    const arr = map.get(i) ?? []
+    arr.push(p)
+    map.set(i, arr)
+  }
+  return map
+})
+
+/** Human label for a pause (type + duration), for tooltips. */
+function pauseLabel(p: Pause): string {
+  const kind = p.kind === 'tactical' ? t('viewer.tacticalTimeout') : t('viewer.techPause')
+  return `${kind} · ${fmt(Math.round((p.endTick - p.startTick) / tickRate.value))}`
+}
+
+/**
+ * Pause bands for the current round's timeline, in seconds from t = 0 (freeze
+ * start), clamped to the round window. A pause that straddles two rounds shows
+ * its overlapping slice in each.
+ */
+const pauseBands = computed(() => {
+  const r = props.round
+  if (!r) return []
+  const fs = r.freezeStartTick ?? r.startTick
+  const dur = totalT.value
+  const bands: { startT: number; endT: number; label: string }[] = []
+  for (const p of props.pauses ?? []) {
+    if (anchorRound(p) !== props.roundIndex) continue
+    const startT = Math.max(0, (p.startTick - fs) / tickRate.value)
+    const endT = Math.min(dur, (p.endTick - fs) / tickRate.value)
+    if (endT <= startT || startT >= dur) continue
+    bands.push({ startT, endT, label: pauseLabel(p) })
+  }
+  return bands
+})
+
 // The timeline works in fraction [0,1]; we convert to the nearest frame.
 function onSeek(fraction: number) {
   emit('seek', Math.round(fraction * Math.max(0, props.frameCount - 1)))
@@ -241,7 +300,7 @@ onMounted(() => centerCurrent('auto'))
       <div class="overflow-hidden">
         <div
           ref="track"
-          class="flex gap-1.5 overflow-x-auto px-0.5 pb-3 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          class="flex gap-1.5 overflow-x-auto px-1.5 pb-3 pt-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           @wheel="onRoundsWheel"
         >
           <template v-for="(r, i) in rounds" :key="r.number">
@@ -257,11 +316,14 @@ onMounted(() => centerCurrent('auto'))
             <button
               :ref="(el) => setRoundEl(el as Element | null, i)"
               v-tooltip="
-                roundLabels[i] === '0'
+                (roundLabels[i] === '0'
                   ? t('viewer.knife')
-                  : `${t('viewer.round')} ${roundLabels[i]}${pistolRounds.has(i) ? ` · ${t('viewer.pistol')}` : ''}${r.winner ? ` · ${r.winner}` : ''}`
+                  : `${t('viewer.round')} ${roundLabels[i]}${pistolRounds.has(i) ? ` · ${t('viewer.pistol')}` : ''}${r.winner ? ` · ${r.winner}` : ''}`) +
+                (roundPauses.get(i)?.length
+                  ? ` · ${roundPauses.get(i)!.map(pauseLabel).join(' · ')}`
+                  : '')
               "
-              class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[0.65rem] font-mono transition-all duration-150"
+              class="relative flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-[0.65rem] font-mono transition-all duration-150"
               :class="[
                 i === roundIndex
                   ? 'scale-110 font-semibold shadow-lg shadow-black/40'
@@ -286,6 +348,14 @@ onMounted(() => centerCurrent('auto'))
                 class="w-4 object-contain"
               />
               <template v-else>{{ roundLabels[i] }}</template>
+              <!-- Pause indicator: amber dot on rounds with a tactical timeout
+                   or tech pause (e.g. major matches). Sits just outside the
+                   bubble; the track's pt leaves room so the clipped overflow
+                   (scroll + reveal animation) doesn't cut it. -->
+              <span
+                v-if="roundPauses.get(i)?.length"
+                class="pointer-events-none absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-ink-900"
+              />
             </button>
           </template>
         </div>
@@ -323,6 +393,7 @@ onMounted(() => centerCurrent('auto'))
         :post-start-t="postStartT"
         :freeze-label="`${t('viewer.freeze')} · ${Math.round(freezeSeconds)}s`"
         :round-end-label="t('viewer.roundEnd')"
+        :pause-bands="pauseBands"
         @seek="onSeek"
       />
 
