@@ -121,7 +121,7 @@ export const MATCHES: MajorMatch[] = [
     bestOf: 3,
     date: 'Jun 20',
     teamA: 'aurora',
-    teamB: null,
+    teamB: 'furia',
     sourceA: 'qf1',
     sourceB: 'qf2',
     scoreA: null,
