@@ -9,6 +9,7 @@ import EconomyView from '@/viewer/EconomyView.vue'
 import DemoPreviewLoop from '@/viewer/DemoPreviewLoop.vue'
 import { useDemoParser } from '@/viewer/useDemoParser'
 import { useRecentDemos, type RecentDemo } from '@/viewer/useRecentDemos'
+import { importArchive } from '@/viewer/demoArchive'
 import { MAP_CALIBRATION } from '@/viewer/calibration'
 import { useI18n } from '@/i18n'
 
@@ -43,6 +44,8 @@ const parseTickDetail = computed(() => {
   })
 })
 const recent = useRecentDemos()
+const importing = ref(false)
+const importError = ref<string | null>(null)
 const dragging = ref(false)
 const input = ref<HTMLInputElement | null>(null)
 // Id of the recent demo currently being reloaded from local storage.
@@ -113,6 +116,11 @@ function pick() {
 async function onFiles(files: FileList | null | undefined) {
   const file = files?.[0]
   if (!file) return
+  // A `.cs2dv` is an exported, already-parsed replay: import it (no re-parsing).
+  if (/\.cs2dv$/i.test(file.name)) {
+    await onImportArchive(file)
+    return
+  }
   // Accept a raw .dem or a supported archive (.gz / .zip / .zst); the worker
   // detects the actual format by magic bytes and decompresses if needed.
   if (!/\.(dem|gz|zip|zst)$/i.test(file.name)) {
@@ -132,6 +140,37 @@ async function onFiles(files: FileList | null | undefined) {
       currentId.value = id // already loaded: keeps the watcher from reloading
       router.push(`/${id}`)
     }
+  }
+}
+
+/** Imports an exported `.cs2dv` (replay + voice + comments) without re-parsing. */
+async function onImportArchive(file: File) {
+  importError.value = null
+  importing.value = true
+  try {
+    const archive = await importArchive(file)
+    const id = await recent.save({
+      fileName: archive.meta.fileName,
+      fileSize: file.size,
+      replay: archive.replay,
+      voice: archive.voice,
+    })
+    if (!id) return
+    // Persist the comments before navigating, so the stage loads them on open.
+    await recent.saveComments(id, archive.comments)
+    // Hydrate now so the URL change doesn't reload it from IndexedDB.
+    parser.hydrate({
+      replay: archive.replay,
+      voice: archive.voice,
+      fileName: archive.meta.fileName,
+      fileSize: file.size,
+    })
+    currentId.value = id
+    router.push(`/${id}`)
+  } catch (err) {
+    importError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    importing.value = false
   }
 }
 
@@ -233,6 +272,8 @@ function fmtDate(ms: number) {
           :replay="parser.replay.value"
           :voice="parser.voice.value"
           :source-label="parser.fileName.value"
+          :id="currentId ?? undefined"
+          :file-name="parser.fileName.value"
         />
       </div>
       <HeatmapView v-if="activeTab === 'heatmap'" :replay="parser.replay.value" />
@@ -381,12 +422,27 @@ function fmtDate(ms: number) {
             <input
               ref="input"
               type="file"
-              accept=".dem,.gz,.zip,.zst"
+              accept=".dem,.gz,.zip,.zst,.cs2dv"
               class="hidden"
               @change="onInput"
               @click.stop
             />
           </div>
+
+          <!-- Import an exported replay (.cs2dv); reuses the file picker -->
+          <button
+            type="button"
+            class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-ink-800 bg-ink-900/40 px-4 py-2.5 text-sm text-ink-300 transition-colors hover:border-ink-600 hover:bg-ink-900/70 hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="importing"
+            @click="pick"
+          >
+            <UiIcon
+              :name="importing ? 'loader' : 'download'"
+              class="h-4 w-4"
+              :class="{ 'animate-spin': importing }"
+            />
+            {{ importing ? t('analyzer.importing') : t('analyzer.import') }}
+          </button>
 
           <div
             v-if="parser.status.value === 'error'"
@@ -396,6 +452,17 @@ function fmtDate(ms: number) {
             <div>
               <p class="font-medium">{{ t('analyzer.errorTitle') }}</p>
               <p class="mt-0.5 text-xs text-loss/80">{{ parser.error.value }}</p>
+            </div>
+          </div>
+
+          <div
+            v-if="importError"
+            class="mt-4 flex items-start gap-3 rounded-lg border border-loss/40 bg-loss/10 p-3 text-sm text-loss"
+          >
+            <UiIcon name="ban" class="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p class="font-medium">{{ t('analyzer.importError') }}</p>
+              <p class="mt-0.5 text-xs text-loss/80">{{ importError }}</p>
             </div>
           </div>
         </div>

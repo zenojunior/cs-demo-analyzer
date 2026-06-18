@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onKeyStroke, useEventListener, useLocalStorage } from '@vueuse/core'
-import type { Replay, VoiceData } from '@/viewer/schema'
+import type { CommentAnchor, CommentKind, Replay, VoiceData } from '@/viewer/schema'
 import ViewerMap from '@/viewer/ViewerMap.vue'
 import ViewerControls from '@/viewer/ViewerControls.vue'
 import ViewerRoster from '@/viewer/ViewerRoster.vue'
 import ViewerKillfeed from '@/viewer/ViewerKillfeed.vue'
 import ViewerChat from '@/viewer/ViewerChat.vue'
 import ViewerScoreboard from '@/viewer/ViewerScoreboard.vue'
+import CommentPopover from '@/viewer/CommentPopover.vue'
+import CommentsPanel from '@/viewer/CommentsPanel.vue'
 import UiIcon from '@/ui/UiIcon.vue'
 import {
   ContextMenu,
@@ -22,6 +24,9 @@ import {
 } from '@/ui/context-menu'
 import { useReplay, SPEEDS } from '@/viewer/useReplay'
 import { useVoicePlayback } from '@/viewer/useVoicePlayback'
+import { useComments } from '@/viewer/useComments'
+import { commentDuration } from '@/viewer/commentAnchor'
+import { exportArchive, archiveFileName } from '@/viewer/demoArchive'
 import { MAP_CALIBRATION } from '@/viewer/calibration'
 import { SIDE_COLOR } from '@/viewer/colors'
 import { roundOutcome } from '@/viewer/roundOutcome'
@@ -41,6 +46,10 @@ const props = defineProps<{
   voice?: VoiceData | null
   /** Source label shown at the top (e.g. "FACEIT demo" or the file name). */
   sourceLabel?: string
+  /** Demo id in local history, used to load/save this demo's comments. */
+  id?: string
+  /** Original demo file name, used to name the exported archive. */
+  fileName?: string
 }>()
 
 const r = useReplay()
@@ -72,6 +81,300 @@ function jumpToThrow({ roundIndex, t }: { roundIndex: number; t: number }) {
   r.pause()
   r.selectRound(roundIndex)
   r.seekBySeconds(t - r.currentT.value)
+}
+
+// --- Comments ----------------------------------------------------------------
+const comments = useComments()
+
+type Popover = {
+  mode: 'create' | 'edit'
+  /** Reference rect in viewport coords (vx,vy = top-left, vw,vh = size); floating-ui
+   *  places the card above/below it. */
+  vx: number
+  vy: number
+  vw: number
+  vh: number
+  /** create: world anchor + the moment + the detected target. */
+  wx?: number
+  wy?: number
+  roundIndex?: number
+  t?: number
+  anchor?: CommentAnchor
+  /** edit: the comment being changed. */
+  id?: string
+  text?: string
+  author?: string
+  duration?: number
+  kind?: CommentKind
+  isArea?: boolean
+  textInside?: boolean
+  /** Resolved target badge shown in the popover. */
+  anchorLabel?: string
+  anchorIcon?: string
+}
+const popover = ref<Popover | null>(null)
+
+/** While creating an area comment, the rectangle being drawn (world coords), so
+ *  the map keeps it visible and connected to the open popover. */
+const pendingArea = computed(() => {
+  const p = popover.value
+  if (p?.mode === 'create' && p.anchor?.kind === 'area' && p.wx != null && p.wy != null) {
+    return { x: p.wx, y: p.wy, x2: p.anchor.x2, y2: p.anchor.y2, kind: p.kind }
+  }
+  return null
+})
+
+/** Live kind change from the popover, so the pending area recolors as you pick. */
+function onPopoverKind(k: CommentKind) {
+  if (popover.value) popover.value.kind = k
+}
+
+/** While the popover is open, its anchor (world coords + kind) so the map can keep
+ *  the popover pinned to it as the view (zoom/pan) or the anchored player moves. */
+const popoverAnchor = computed(() => {
+  const p = popover.value
+  if (!p || !p.anchor || p.wx == null || p.wy == null) return null
+  return { anchor: p.anchor, wx: p.wx, wy: p.wy }
+})
+/** The map recomputed the anchor's screen rect; re-pin the popover to it. */
+function onPopoverMoved(rect: { vx: number; vy: number; vw: number; vh: number }) {
+  const p = popover.value
+  if (!p) return
+  p.vx = rect.vx
+  p.vy = rect.vy
+  p.vw = rect.vw
+  p.vh = rect.vh
+}
+
+// Right-click context menu actions, keyed to the comment under the cursor (set on
+// contextmenu by the map; null when the right-click missed every comment).
+const contextComment = ref<{ id: string; vx: number; vy: number; vw: number; vh: number } | null>(null)
+function onContextComment(p: { id: string; vx: number; vy: number; vw: number; vh: number } | null) {
+  contextComment.value = p
+}
+function editContextComment() {
+  if (contextComment.value) onSelectComment(contextComment.value)
+}
+function deleteContextComment() {
+  if (contextComment.value) comments.remove(contextComment.value.id)
+}
+
+/** An area comment was resized by dragging a corner handle on the map. */
+function onResizeArea(p: { id: string; x: number; y: number; x2: number; y2: number }) {
+  comments.setArea(p.id, p.x, p.y, p.x2, p.y2)
+}
+
+// Right-click target for a new comment (a player under the cursor), for the
+// "add a comment" context-menu action.
+const contextTarget = ref<{ x: number; y: number; anchor: CommentAnchor; vx: number; vy: number } | null>(null)
+function onContextTarget(p: { x: number; y: number; anchor: CommentAnchor; vx: number; vy: number } | null) {
+  contextTarget.value = p
+}
+function addContextComment() {
+  const tgt = contextTarget.value
+  if (tgt) onDropComment({ x: tgt.x, y: tgt.y, anchor: tgt.anchor, vx: tgt.vx, vy: tgt.vy, vw: 0, vh: 0 })
+}
+const commentMode = ref(false)
+const lastAuthor = useLocalStorage('viewer.comment.author', '')
+const stageEl = ref<HTMLElement | null>(null)
+
+// Load this demo's comments (and clear when switching demos).
+watch(
+  () => props.id,
+  (id) => {
+    popover.value = null
+    comments.clear()
+    if (id) void comments.loadFor(id)
+  },
+  { immediate: true },
+)
+
+/** Comments anchored to the round in view (drives the pins + timeline markers). */
+const roundComments = computed(() =>
+  comments.comments.value.filter((c) => c.roundIndex === r.roundIndex.value),
+)
+
+/** Round indices that have at least one comment (drives the round badge). */
+const commentedRounds = computed(() => {
+  const s = new Set<number>()
+  for (const c of comments.comments.value) s.add(c.roundIndex)
+  return s
+})
+
+function toggleCommentMode() {
+  commentMode.value = !commentMode.value
+  // Pause on entering so the map (and the bubbles) stays still while annotating.
+  if (commentMode.value) r.pause()
+  else popover.value = null
+}
+
+/** Human label for what a comment is anchored to (player name / grenade / point). */
+function anchorLabel(anchor: CommentAnchor): string {
+  if (anchor.kind === 'player') {
+    return r.playersById.value.get(anchor.steamId)?.name ?? t('viewer.comment.targetPlayer')
+  }
+  if (anchor.kind === 'grenade') return t(`grenadeKind.${anchor.grenadeKind}`)
+  if (anchor.kind === 'area') return t('viewer.comment.targetArea')
+  return t('viewer.comment.targetPoint')
+}
+function anchorIcon(anchor: CommentAnchor): string {
+  if (anchor.kind === 'player') return 'user'
+  if (anchor.kind === 'grenade') return 'flame'
+  if (anchor.kind === 'area') return 'square'
+  return 'map-pin'
+}
+
+function onDropComment(p: {
+  x: number
+  y: number
+  anchor: CommentAnchor
+  vx: number
+  vy: number
+  vw: number
+  vh: number
+}) {
+  r.pause()
+  popover.value = {
+    mode: 'create',
+    vx: p.vx,
+    vy: p.vy,
+    vw: p.vw,
+    vh: p.vh,
+    wx: p.x,
+    wy: p.y,
+    roundIndex: r.roundIndex.value,
+    t: r.currentT.value,
+    anchor: p.anchor,
+    author: lastAuthor.value,
+    duration: 5,
+    kind: 'note',
+    isArea: p.anchor.kind === 'area',
+    textInside: false,
+    anchorLabel: anchorLabel(p.anchor),
+    anchorIcon: anchorIcon(p.anchor),
+  }
+}
+
+function jumpToComment(c: { roundIndex: number; t: number }) {
+  r.pause()
+  r.selectRound(c.roundIndex)
+  r.seekBySeconds(c.t - r.currentT.value)
+}
+
+function onSelectComment(p: { id: string; vx: number; vy: number; vw: number; vh: number }) {
+  const c = comments.comments.value.find((x) => x.id === p.id)
+  if (!c) return
+  jumpToComment(c)
+  popover.value = {
+    mode: 'edit',
+    vx: p.vx,
+    vy: p.vy,
+    vw: p.vw,
+    vh: p.vh,
+    anchor: c.anchor,
+    wx: c.x,
+    wy: c.y,
+    id: c.id,
+    text: c.text,
+    author: c.author ?? '',
+    duration: commentDuration(c),
+    kind: c.kind ?? 'note',
+    isArea: c.anchor.kind === 'area',
+    textInside: c.textInside ?? false,
+    anchorLabel: anchorLabel(c.anchor),
+    anchorIcon: anchorIcon(c.anchor),
+  }
+}
+
+function onPopoverSave({
+  text,
+  author,
+  duration,
+  kind,
+  textInside,
+}: {
+  text: string
+  author: string
+  duration: number
+  kind: CommentKind
+  textInside: boolean
+}) {
+  const p = popover.value
+  if (!p) return
+  lastAuthor.value = author
+  if (p.mode === 'create') {
+    comments.add({
+      roundIndex: p.roundIndex ?? r.roundIndex.value,
+      t: p.t ?? r.currentT.value,
+      duration,
+      x: p.wx ?? 0,
+      y: p.wy ?? 0,
+      anchor: p.anchor ?? { kind: 'point' },
+      kind,
+      textInside,
+      text,
+      author,
+    })
+  } else if (p.id) {
+    comments.update(p.id, { text, author, duration, kind, textInside })
+  }
+  popover.value = null
+}
+
+function onPopoverRemove() {
+  if (popover.value?.id) comments.remove(popover.value.id)
+  popover.value = null
+}
+
+// Switching rounds from the controls dismisses an open popover (its pin is
+// round-scoped); jump-to-comment stays on the same round, so it is unaffected.
+function selectRound(i: number) {
+  popover.value = null
+  r.selectRound(i)
+}
+
+// --- Comments panel (side drawer) --------------------------------------------
+const panelOpen = ref(false)
+function onPanelUpdate(patch: {
+  id: string
+  text?: string
+  author?: string
+  duration?: number
+  kind?: CommentKind
+  textInside?: boolean
+}) {
+  comments.update(patch.id, patch)
+}
+
+// --- Export ------------------------------------------------------------------
+const exporting = ref(false)
+const exportError = ref<string | null>(null)
+async function exportReplay() {
+  if (exporting.value) return
+  exporting.value = true
+  exportError.value = null
+  try {
+    const name = props.fileName || props.sourceLabel || props.replay.map
+    const blob = await exportArchive({
+      fileName: props.fileName || props.sourceLabel || `${props.replay.map}.dem`,
+      replay: props.replay,
+      voice: props.voice ?? null,
+      comments: comments.comments.value,
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = archiveFileName(name)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    exportError.value = err instanceof Error ? err.message : String(err)
+    console.error('Replay export failed:', err)
+  } finally {
+    exporting.value = false
+  }
 }
 
 // Player advanced options ("Advanced" menu). Extensible: each item toggles a
@@ -207,7 +510,7 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
 <template>
   <ContextMenu v-if="r.replay.value">
     <ContextMenuTrigger as-child>
-      <div class="relative h-full w-full select-none bg-ink-950">
+      <div ref="stageEl" class="relative h-full w-full select-none bg-ink-950">
         <!-- Fullscreen map (zoom/pan) -->
         <ViewerMap
       :players="r.players.value"
@@ -221,6 +524,17 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
       :auto-zoom="autoZoom"
       :radar-src="activeLevelRadar"
       :level-range="activeLevelRange"
+      :comments="roundComments"
+      :comment-mode="commentMode"
+      :active-comment-id="popover?.id ?? null"
+      :pending-area="pendingArea"
+      @drop-comment="onDropComment"
+      @select-comment="onSelectComment"
+      :popover-anchor="popoverAnchor"
+      @context-comment="onContextComment"
+      @context-target="onContextTarget"
+      @resize-area="onResizeArea"
+      @popover-moved="onPopoverMoved"
     />
 
     <!-- Top: score and current round -->
@@ -310,11 +624,62 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
             {{ r.score.value.T }}
           </span>
         </div>
+
+        <!-- Right: comments panel, export -->
+        <div class="pointer-events-auto flex items-center gap-1.5">
+          <button
+            v-tooltip="t('viewer.comment.panelTitle')"
+            class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-colors duration-150"
+            :class="panelOpen ? 'bg-surge-500 text-white' : 'text-ink-200 hover:bg-white/10 hover:text-white'"
+            @click="panelOpen = !panelOpen"
+          >
+            <UiIcon name="message" class="h-5 w-5" />
+          </button>
+          <button
+            v-tooltip="t('viewer.exportTitle')"
+            :disabled="exporting"
+            class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-200 transition-colors duration-150 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            @click="exportReplay"
+          >
+            <UiIcon
+              :name="exporting ? 'loader' : 'download'"
+              class="h-5 w-5"
+              :class="{ 'animate-spin': exporting }"
+            />
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Killfeed: round kills up to the current moment (top-right) -->
-    <div class="pointer-events-none absolute right-4 top-4 z-10">
+    <!-- Comment mode hint -->
+    <div
+      v-if="commentMode && !exportError"
+      class="pointer-events-none absolute inset-x-0 top-20 z-10 flex justify-center"
+    >
+      <span class="rounded-full bg-surge-500/90 px-3 py-1 text-xs font-medium text-white shadow-lg backdrop-blur">
+        {{ t('viewer.comment.modeHint') }}
+      </span>
+    </div>
+
+    <!-- Export error: dismissible banner -->
+    <div
+      v-if="exportError"
+      class="pointer-events-auto absolute inset-x-0 top-20 z-20 flex justify-center"
+    >
+      <button
+        type="button"
+        v-tooltip="exportError"
+        class="flex cursor-pointer items-center gap-2 rounded-full bg-loss/90 px-3 py-1 text-xs font-medium text-white shadow-lg backdrop-blur"
+        @click="exportError = null"
+      >
+        <UiIcon name="ban" class="h-3.5 w-3.5" />
+        {{ t('viewer.exportError') }}
+        <UiIcon name="x" class="h-3.5 w-3.5" />
+      </button>
+    </div>
+
+    <!-- Killfeed: round kills up to the current moment (top-right, below the top bar) -->
+    <div class="pointer-events-none absolute right-4 top-16 z-10">
       <ViewerKillfeed
         :round="r.round.value"
         :current-t="r.currentT.value"
@@ -417,9 +782,13 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
           :waveform="audio.roundWaveform.value"
           :demo-tick-rate="r.replay.value.demoTickRate"
           :pauses="r.replay.value.pauses ?? []"
+          :comments="roundComments"
+          :commented-rounds="commentedRounds"
+          :comment-mode="commentMode"
           @toggle="r.toggle"
+          @toggle-comment-mode="toggleCommentMode"
           @seek="r.seek"
-          @select-round="r.selectRound"
+          @select-round="selectRound"
           @set-speed="(s) => (r.speed.value = s)"
           @toggle-mute="audio.toggleMute"
           @set-master-volume="audio.setMasterVolume"
@@ -429,11 +798,69 @@ defineExpose({ pause: r.pause, jumpToThrow, roundIndex: r.roundIndex })
         />
       </div>
     </div>
+
+    <!-- Comment create/edit popover, anchored at the pin -->
+    <CommentPopover
+      v-if="popover"
+      :key="popover.id ?? `${popover.vx}-${popover.vy}`"
+      :mode="popover.mode"
+      :vx="popover.vx"
+      :vy="popover.vy"
+      :vw="popover.vw"
+      :vh="popover.vh"
+      :text="popover.text"
+      :author="popover.author"
+      :duration="popover.duration"
+      :kind="popover.kind"
+      :is-area="popover.isArea"
+      :text-inside="popover.textInside"
+      :anchor-label="popover.anchorLabel"
+      :anchor-icon="popover.anchorIcon"
+      @update:kind="onPopoverKind"
+      @save="onPopoverSave"
+      @remove="onPopoverRemove"
+      @close="popover = null"
+    />
+
+    <!-- Comments side drawer -->
+    <CommentsPanel
+      v-if="panelOpen"
+      :comments="comments.comments.value"
+      :round-labels="r.roundLabels.value"
+      :players-by-id="r.playersById.value"
+      @update="onPanelUpdate"
+      @remove="comments.remove"
+      @jump="jumpToComment"
+      @close="panelOpen = false"
+    />
       </div>
     </ContextMenuTrigger>
 
     <!-- Context menu (right click) of the replay -->
     <ContextMenuContent class="w-60">
+      <!-- Comment actions, shown when the right-click landed on a comment -->
+      <template v-if="contextComment">
+        <ContextMenuItem @select="editContextComment">
+          <UiIcon name="pencil" class="h-4 w-4 text-ink-400" />
+          {{ t('viewer.comment.edit') }}
+        </ContextMenuItem>
+        <ContextMenuItem @select="deleteContextComment">
+          <UiIcon name="trash-2" class="h-4 w-4 text-ink-400" />
+          {{ t('viewer.comment.delete') }}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+      </template>
+      <!-- Add a comment on the player under the right-click -->
+      <template v-else-if="contextTarget">
+        <ContextMenuItem @select="addContextComment">
+          <UiIcon name="message" class="h-4 w-4 text-ink-400" />
+          {{ t('viewer.comment.add') }}
+          <span class="ml-auto max-w-28 truncate pl-3 text-ink-400">
+            {{ anchorLabel(contextTarget.anchor) }}
+          </span>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+      </template>
       <ContextMenuItem @select="r.toggle">
         <UiIcon :name="r.playing.value ? 'pause' : 'play'" class="h-4 w-4 text-ink-400" />
         {{ r.playing.value ? t('viewer.pause') : t('viewer.play') }}
