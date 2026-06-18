@@ -82,9 +82,13 @@ export const MATCHES: MajorMatch[] = [
     date: 'Jun 18',
     teamA: '9z',
     teamB: 'furia',
-    scoreA: null,
-    scoreB: null,
-    maps: [],
+    scoreA: 1,
+    scoreB: 2,
+    maps: [
+      { map: 'de_dust2', replay: `${REPLAY_DIR}/qf2-dust2.cs2dv` },
+      { map: 'de_mirage', replay: `${REPLAY_DIR}/qf2-mirage.cs2dv` },
+      { map: 'de_overpass', replay: `${REPLAY_DIR}/qf2-overpass.cs2dv` },
+    ],
   },
   {
     id: 'qf3',
