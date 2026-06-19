@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import UiIcon from '@/ui/UiIcon.vue'
 import ViewerStage from '@/viewer/player/ViewerStage.vue'
 import HeatmapView from '@/viewer/analysis/HeatmapView.vue'
-import GrenadesView from '@/viewer/analysis/GrenadesView.vue'
+import UtilitiesView from '@/viewer/analysis/UtilitiesView.vue'
 import EconomyView from '@/viewer/analysis/EconomyView.vue'
 import DemoPreviewLoop from '@/viewer/player/DemoPreviewLoop.vue'
 import { useDemoParser } from '@/viewer/ingest/useDemoParser'
@@ -60,30 +60,31 @@ const routeLoading = ref(false)
 const currentId = ref<string | null>(null)
 // URL of the currently open external replay (Major demo), if any (same purpose).
 const currentSrc = ref<string | null>(null)
-type Tab = 'viewer' | 'heatmap' | 'grenades' | 'economy'
+type Tab = 'viewer' | 'heatmap' | 'utilities' | 'economy'
 // The active tab is driven by the URL: `/:id` is the 2D stage, `/:id/heatmaps`
-// the heatmap, `/:id/grenades` the grenades page, `/:id/economy` the economy page.
+// the heatmap, `/:id/utilities` the utilities page, `/:id/economy` the economy page.
 const activeTab = computed<Tab>(() => {
   // History demos carry the tab as a path segment (/:id/:tab); external replays
   // (?replay=) have no id, so the tab rides along as ?tab=.
   const raw = route.params.tab || route.query.tab
   const tab = Array.isArray(raw) ? raw[0] : raw
   if (tab === 'heatmaps') return 'heatmap'
-  if (tab === 'grenades') return 'grenades'
+  // `grenades` kept as a backward-compatible alias for older links.
+  if (tab === 'utilities' || tab === 'grenades') return 'utilities'
   if (tab === 'economy') return 'economy'
   return 'viewer'
 })
 const TAB_SEGMENT: Record<Tab, string> = {
   viewer: '',
   heatmap: '/heatmaps',
-  grenades: '/grenades',
+  utilities: '/utilities',
   economy: '/economy',
 }
 // Tab name used in the ?tab= query for external replays ('viewer' = no param).
 const TAB_QUERY: Record<Tab, string | undefined> = {
   viewer: undefined,
   heatmap: 'heatmaps',
-  grenades: 'grenades',
+  utilities: 'utilities',
   economy: 'economy',
 }
 function goTab(tab: Tab) {
@@ -118,12 +119,10 @@ watch(activeTab, (tab) => {
   if (tab !== 'viewer') stage.value?.pause()
 })
 
-// Players indexed by steamId, for the grenades page filters/labels.
+// Players indexed by steamId, for the utilities page filters/labels.
 const playersById = computed(
   () => new Map((parser.replay.value?.players ?? []).map((p) => [p.steamId, p] as const)),
 )
-// Focused round in the replay, for the grenades "current round only" filter.
-const stageRoundIndex = computed(() => stage.value?.roundIndex ?? 0)
 
 // A grenade picked on its tab seeks the replay to the throw and switches back.
 function onGrenadeJump(payload: { roundIndex: number; t: number }) {
@@ -341,16 +340,15 @@ function fmtDate(ms: number) {
         />
       </div>
       <HeatmapView v-if="activeTab === 'heatmap'" :replay="parser.replay.value" />
-      <GrenadesView
-        v-if="activeTab === 'grenades'"
+      <UtilitiesView
+        v-if="activeTab === 'utilities'"
         :replay="parser.replay.value"
         :players-by-id="playersById"
-        :current-round-index="stageRoundIndex"
         @jump="onGrenadeJump"
       />
       <EconomyView v-if="activeTab === 'economy'" :replay="parser.replay.value" />
 
-      <!-- Tabs (2D / Heatmaps / Grenades) in the center of the appbar -->
+      <!-- Tabs (2D / Heatmaps / Utilities / Economy) in the center of the appbar -->
       <Teleport to="#publicbar-center">
         <div class="flex items-center gap-0.5 rounded-lg border border-ink-700 bg-ink-900/60 p-0.5">
           <button
@@ -372,10 +370,10 @@ function fmtDate(ms: number) {
           <button
             type="button"
             class="cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors"
-            :class="activeTab === 'grenades' ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
-            @click="goTab('grenades')"
+            :class="activeTab === 'utilities' ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
+            @click="goTab('utilities')"
           >
-            {{ t('tabs.grenades') }}
+            {{ t('tabs.utilities') }}
           </button>
           <button
             type="button"

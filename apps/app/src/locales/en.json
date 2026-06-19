@@ -48,6 +48,7 @@
     "replay": "2D Replay",
     "heatmaps": "Heatmaps",
     "grenades": "Grenades",
+    "utilities": "Utilities",
     "economy": "Economy"
   },
   "analyzer": {
@@ -161,17 +162,41 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Grenades",
     "data": "Type",
     "all": "All",
     "side": "Side",
     "both": "Both",
     "player": "Player",
     "allPlayers": "All players",
-    "currentRoundOnly": "Current round only",
     "empty": "No grenades for the current filters.",
     "unknown": "Unknown",
     "hint": "Hover a grenade to isolate its trajectory · click to open it in the replay"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Throws",
+      "flashes": "Flashes",
+      "damage": "Damage"
+    },
+    "empty": "No utility data for this demo.",
+    "flash": {
+      "thrown": "Thrown",
+      "enemiesBlinded": "Enemies blinded",
+      "duration": "Duration (s)",
+      "perThrow": "Blinded per throw",
+      "perRound": "Blinded per round",
+      "matrixTitle": "Blind matrix",
+      "matrixHint": "Row blinded column: total duration in seconds (allies included)",
+      "empty": "This demo has no flash data (no blind events)."
+    },
+    "damage": {
+      "thrown": "Thrown",
+      "total": "Damage",
+      "perThrow": "Damage per throw",
+      "perRound": "Damage per round",
+      "kills": "Kills",
+      "hint": "Damage from HE and molotov (utility kills included)"
+    }
   },
   "heatmap": {
     "title": "Heatmap",

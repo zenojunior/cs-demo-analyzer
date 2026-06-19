@@ -48,6 +48,7 @@
     "replay": "2D Replay",
     "heatmaps": "Heatmap'ler",
     "grenades": "Granatlar",
+    "utilities": "Utility",
     "economy": "Ekonomi"
   },
   "analyzer": {
@@ -161,17 +162,41 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Granatlar",
     "data": "Tür",
     "all": "Tümü",
     "side": "Taraf",
     "both": "İkisi de",
     "player": "Oyuncu",
     "allPlayers": "Tüm oyuncular",
-    "currentRoundOnly": "Yalnızca geçerli raunt",
     "empty": "Geçerli filtreler için granat yok.",
     "unknown": "Bilinmiyor",
     "hint": "Bir granadın üzerine gelin, yörüngesini yalıtın · replay'de açmak için tıklayın"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Atışlar",
+      "flashes": "Flaşlar",
+      "damage": "Hasar"
+    },
+    "empty": "Bu demo için ekipman verisi yok.",
+    "flash": {
+      "thrown": "Atılan",
+      "enemiesBlinded": "Kör edilen düşmanlar",
+      "duration": "Süre (s)",
+      "perThrow": "Atış başına kör",
+      "perRound": "Tur başına kör",
+      "matrixTitle": "Körlük matrisi",
+      "matrixHint": "Satır sütunu kör etti: saniye cinsinden toplam süre (takım arkadaşları dahil)",
+      "empty": "Bu demoda flaş verisi yok (körlük olayı yok)."
+    },
+    "damage": {
+      "thrown": "Atılan",
+      "total": "Hasar",
+      "perThrow": "Atış başına hasar",
+      "perRound": "Tur başına hasar",
+      "kills": "Öldürme",
+      "hint": "HE ve molotof hasarı (ekipman öldürmeleri dahil)"
+    }
   },
   "heatmap": {
     "title": "Heatmap",

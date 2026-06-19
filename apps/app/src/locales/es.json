@@ -48,6 +48,7 @@
     "replay": "Replay 2D",
     "heatmaps": "Heatmaps",
     "grenades": "Granadas",
+    "utilities": "Utilidad",
     "economy": "Economía"
   },
   "analyzer": {
@@ -161,17 +162,41 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Granadas",
     "data": "Tipo",
     "all": "Todas",
     "side": "Lado",
     "both": "Ambos",
     "player": "Jugador",
     "allPlayers": "Todos los jugadores",
-    "currentRoundOnly": "Solo la ronda actual",
     "empty": "Sin granadas para los filtros actuales.",
     "unknown": "Desconocido",
     "hint": "Pasa el cursor sobre una granada para aislar su trayectoria · haz clic para abrirla en el replay"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Lanzamientos",
+      "flashes": "Flashes",
+      "damage": "Daño"
+    },
+    "empty": "No hay datos de utilidad para esta demo.",
+    "flash": {
+      "thrown": "Lanzadas",
+      "enemiesBlinded": "Enemigos cegados",
+      "duration": "Duración (s)",
+      "perThrow": "Cegados por lanzamiento",
+      "perRound": "Cegados por ronda",
+      "matrixTitle": "Matriz de ceguera",
+      "matrixHint": "La fila cegó a la columna: duración total en segundos (incluye aliados)",
+      "empty": "Esta demo no tiene datos de flash (sin eventos de ceguera)."
+    },
+    "damage": {
+      "thrown": "Lanzadas",
+      "total": "Daño",
+      "perThrow": "Daño por lanzamiento",
+      "perRound": "Daño por ronda",
+      "kills": "Bajas",
+      "hint": "Daño de HE y molotov (bajas con utilidad incluidas)"
+    }
   },
   "heatmap": {
     "title": "Heatmap",

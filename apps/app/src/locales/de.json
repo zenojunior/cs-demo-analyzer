@@ -48,6 +48,7 @@
     "replay": "2D-Replay",
     "heatmaps": "Heatmaps",
     "grenades": "Granaten",
+    "utilities": "Utilities",
     "economy": "Economy"
   },
   "analyzer": {
@@ -161,17 +162,41 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Granaten",
     "data": "Typ",
     "all": "Alle",
     "side": "Seite",
     "both": "Beide",
     "player": "Spieler",
     "allPlayers": "Alle Spieler",
-    "currentRoundOnly": "Nur aktuelle Runde",
     "empty": "Keine Granaten für die aktuellen Filter.",
     "unknown": "Unbekannt",
     "hint": "Fahre mit der Maus über eine Granate, um ihre Flugbahn zu isolieren · klicke, um sie im Replay zu öffnen"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Würfe",
+      "flashes": "Flashes",
+      "damage": "Schaden"
+    },
+    "empty": "Keine Utility-Daten für dieses Demo.",
+    "flash": {
+      "thrown": "Geworfen",
+      "enemiesBlinded": "Geblendete Gegner",
+      "duration": "Dauer (s)",
+      "perThrow": "Geblendet pro Wurf",
+      "perRound": "Geblendet pro Runde",
+      "matrixTitle": "Blend-Matrix",
+      "matrixHint": "Zeile blendete Spalte: Gesamtdauer in Sekunden (Verbündete inbegriffen)",
+      "empty": "Dieses Demo hat keine Flash-Daten (keine Blend-Events)."
+    },
+    "damage": {
+      "thrown": "Geworfen",
+      "total": "Schaden",
+      "perThrow": "Schaden pro Wurf",
+      "perRound": "Schaden pro Runde",
+      "kills": "Kills",
+      "hint": "Schaden durch HE und Molotov (Utility-Kills inbegriffen)"
+    }
   },
   "heatmap": {
     "title": "Heatmap",

@@ -84,6 +84,9 @@ export interface Round {
   tName: string
   /** Health damage per player (steamId -> total) this round. */
   damage: Record<string, number>
+  /** Utility (HE + molotov/incendiary) health damage per player (steamId ->
+   *  total) this round. A subset of `damage`; powers the utility impact view. */
+  utilityDamage: Record<string, number>
   /** Time samples of positions, already downsampled. */
   frames: Frame[]
   /** Round events (kills, bomb, etc.) in tick order. */
@@ -155,7 +158,11 @@ export interface BlindFlash {
   t: number
   /** Total blind duration, in seconds. */
   duration: number
+  /** The blinded player (victim). */
   steamId: string
+  /** Who threw the flash (steamId64), when resolved; null otherwise. Lets the
+   *  utility impact view attribute "enemies flashed" to a player. */
+  flasherSteamId: string | null
 }
 
 /** Flight arc of a grenade, from throw to landing/detonation. */

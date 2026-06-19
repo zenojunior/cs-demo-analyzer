@@ -48,6 +48,7 @@
     "replay": "Replay 2D",
     "heatmaps": "Heatmaps",
     "grenades": "Grenades",
+    "utilities": "Utilitaires",
     "economy": "Économie"
   },
   "analyzer": {
@@ -161,17 +162,41 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Grenades",
     "data": "Type",
     "all": "Toutes",
     "side": "Camp",
     "both": "Les deux",
     "player": "Joueur",
     "allPlayers": "Tous les joueurs",
-    "currentRoundOnly": "Round actuel uniquement",
     "empty": "Aucune grenade pour les filtres actuels.",
     "unknown": "Inconnu",
     "hint": "Survolez une grenade pour isoler sa trajectoire · cliquez pour l'ouvrir dans le replay"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Lancers",
+      "flashes": "Flashes",
+      "damage": "Dégâts"
+    },
+    "empty": "Aucune donnée utilitaire pour cette démo.",
+    "flash": {
+      "thrown": "Lancées",
+      "enemiesBlinded": "Ennemis aveuglés",
+      "duration": "Durée (s)",
+      "perThrow": "Aveuglés par lancer",
+      "perRound": "Aveuglés par manche",
+      "matrixTitle": "Matrice d’aveuglement",
+      "matrixHint": "La ligne a aveuglé la colonne : durée totale en secondes (alliés inclus)",
+      "empty": "Cette démo n’a aucune donnée de flash (aucun aveuglement)."
+    },
+    "damage": {
+      "thrown": "Lancées",
+      "total": "Dégâts",
+      "perThrow": "Dégâts par lancer",
+      "perRound": "Dégâts par manche",
+      "kills": "Éliminations",
+      "hint": "Dégâts de HE et molotov (éliminations à l’utilitaire incluses)"
+    }
   },
   "heatmap": {
     "title": "Heatmap",

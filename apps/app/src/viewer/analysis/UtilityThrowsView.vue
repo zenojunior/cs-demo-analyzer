@@ -12,23 +12,21 @@ import type {
 import { MAP_CALIBRATION } from '@/viewer/domain/calibration'
 import { SIDE_COLOR } from '@/viewer/domain/colors'
 import ViewerMap from '@/viewer/player/ViewerMap.vue'
-import UiIcon from '@/ui/UiIcon.vue'
+import UiSelect from '@/ui/UiSelect.vue'
 import { useI18n } from '@/i18n'
 
 // `t` is the template loop variable; i18n is aliased as `tr`.
 const { t: tr } = useI18n()
 
 /**
- * Grenades page: lists every grenade throw of the match, filterable by type,
- * side, player and round. Hovering a throw previews its full arc on the radar
- * to the right; clicking it asks the parent to open the 2D replay at the throw
+ * Grenades throws page: lists every grenade throw of the match, filterable by
+ * type, side and player. Hovering a throw previews its full arc on the radar to
+ * the right; clicking it asks the parent to open the 2D replay at the throw
  * instant. Reuses the data the parser already emits (`Round.grenadePaths`).
  */
 const props = defineProps<{
   replay: Replay
   playersById: Map<string, PlayerMeta>
-  /** Currently focused round (0-based index), for the "this round only" filter. */
-  currentRoundIndex: number
 }>()
 
 const emit = defineEmits<{
@@ -112,6 +110,29 @@ const KIND_COLOR: Record<GrenadeKind, string> = {
   flash: 'rgba(255, 238, 170, 0.95)',
   decoy: 'rgba(140, 150, 165, 0.95)',
 }
+/** Utility icon (white SVG under /public/weapons) per grenade type. */
+const KIND_ICON: Record<GrenadeKind, string> = {
+  smoke: '/weapons/smoke.svg',
+  fire: '/weapons/molotov.svg',
+  he: '/weapons/he.svg',
+  flash: '/weapons/flash.svg',
+  decoy: '/weapons/decoy.svg',
+}
+/** Inline CSS mask painting the single-color icon SVG in the kind's data color. */
+function iconStyle(kind: GrenadeKind) {
+  const src = KIND_ICON[kind]
+  return {
+    maskImage: `url(${src})`,
+    WebkitMaskImage: `url(${src})`,
+    maskSize: 'contain',
+    WebkitMaskSize: 'contain',
+    maskRepeat: 'no-repeat',
+    WebkitMaskRepeat: 'no-repeat',
+    maskPosition: 'center',
+    WebkitMaskPosition: 'center',
+    backgroundColor: KIND_COLOR[kind],
+  }
+}
 /** Translated grenade type label. */
 function kindLabel(k: GrenadeKind): string {
   return tr(`grenadeKind.${k}`)
@@ -172,8 +193,7 @@ const allThrows = computed<Throw[]>(() => {
 // --- Filters ---
 const kindFilter = ref<GrenadeKind | 'all'>('all')
 const sideFilter = ref<Side | 'all'>('all')
-const playerFilter = ref<string | 'all'>('all')
-const currentRoundOnly = ref(false)
+const playerFilter = ref<string>('all')
 
 /** Players who threw something, for the selector (name + steamId). */
 const throwers = computed(() => {
@@ -186,12 +206,17 @@ const throwers = computed(() => {
   return [...seen.entries()].map(([steamId, name]) => ({ steamId, name }))
 })
 
+/** Options for the player select ("all" + every thrower). */
+const playerOptions = computed(() => [
+  { value: 'all', label: tr('grenades.allPlayers') },
+  ...throwers.value.map((p) => ({ value: p.steamId, label: p.name })),
+])
+
 const filtered = computed(() =>
   allThrows.value.filter((t) => {
     if (kindFilter.value !== 'all' && t.kind !== kindFilter.value) return false
     if (sideFilter.value !== 'all' && t.side !== sideFilter.value) return false
     if (playerFilter.value !== 'all' && t.throwerSteamId !== playerFilter.value) return false
-    if (currentRoundOnly.value && t.roundIndex !== props.currentRoundIndex) return false
     return true
   }),
 )
@@ -212,7 +237,6 @@ const countsByKind = computed(() => {
   for (const t of allThrows.value) {
     if (sideFilter.value !== 'all' && t.side !== sideFilter.value) continue
     if (playerFilter.value !== 'all' && t.throwerSteamId !== playerFilter.value) continue
-    if (currentRoundOnly.value && t.roundIndex !== props.currentRoundIndex) continue
     c.all++
     c[t.kind] = (c[t.kind] ?? 0) + 1
   }
@@ -244,13 +268,6 @@ function onLeave() {
   <div class="flex h-full w-full">
     <!-- Filtros + lista -->
     <aside class="flex w-72 shrink-0 flex-col border-r border-ink-800 bg-ink-900/40">
-      <!-- Cabeçalho -->
-      <header class="flex items-center gap-2 border-b border-ink-800 px-4 py-3">
-        <UiIcon name="search" class="h-4 w-4 text-surge-400" />
-        <h3 class="font-display text-sm text-ink-50">{{ tr('grenades.title') }}</h3>
-        <span class="ml-auto font-mono text-xs text-ink-400">{{ filtered.length }}</span>
-      </header>
-
       <!-- Filtros -->
       <div class="space-y-2 border-b border-ink-800 p-3">
         <!-- Tipo -->
@@ -272,7 +289,7 @@ function onLeave() {
             :class="kindFilter === k ? 'bg-surge-500/20 text-surge-200' : 'text-ink-300 hover:bg-ink-800'"
             @click="kindFilter = k"
           >
-            <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: KIND_COLOR[k] }" />
+            <span class="h-3.5 w-3.5" :style="iconStyle(k)" />
             {{ kindLabel(k) }}
             <span class="font-mono text-ink-500">{{ countsByKind[k] ?? 0 }}</span>
           </button>
@@ -294,19 +311,13 @@ function onLeave() {
             </button>
           </div>
 
-          <select
+          <UiSelect
             v-model="playerFilter"
-            class="min-w-0 flex-1 cursor-pointer rounded border border-ink-700 bg-ink-950 px-2 py-1 text-xs text-ink-200"
-          >
-            <option value="all">{{ tr('grenades.allPlayers') }}</option>
-            <option v-for="p in throwers" :key="p.steamId" :value="p.steamId">{{ p.name }}</option>
-          </select>
+            :options="playerOptions"
+            :placeholder="tr('grenades.allPlayers')"
+            class="min-w-0 flex-1"
+          />
         </div>
-
-        <label class="flex cursor-pointer items-center gap-2 text-xs text-ink-300">
-          <input v-model="currentRoundOnly" type="checkbox" class="cursor-pointer accent-surge-500" />
-          {{ tr('grenades.currentRoundOnly') }}
-        </label>
       </div>
 
       <!-- Lista -->
@@ -323,8 +334,8 @@ function onLeave() {
             @mouseleave="onLeave()"
           >
             <span
-              class="h-2.5 w-2.5 shrink-0 rounded-full"
-              :style="{ backgroundColor: KIND_COLOR[t.kind] }"
+              class="h-4 w-4 shrink-0"
+              :style="iconStyle(t.kind)"
               :title="kindLabel(t.kind)"
             />
             <span class="w-12 shrink-0 text-xs text-ink-400">{{ kindLabel(t.kind) }}</span>

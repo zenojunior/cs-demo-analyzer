@@ -48,6 +48,7 @@
     "replay": "Powtórka 2D",
     "heatmaps": "Heatmapy",
     "grenades": "Granaty",
+    "utilities": "Utility",
     "economy": "Ekonomia"
   },
   "analyzer": {
@@ -161,17 +162,41 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Granaty",
     "data": "Typ",
     "all": "Wszystkie",
     "side": "Strona",
     "both": "Obie",
     "player": "Gracz",
     "allPlayers": "Wszyscy gracze",
-    "currentRoundOnly": "Tylko bieżąca runda",
     "empty": "Brak granatów dla bieżących filtrów.",
     "unknown": "Nieznany",
     "hint": "Najedź na granat, aby wyizolować jego tor · kliknij, aby otworzyć go w powtórce"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Rzuty",
+      "flashes": "Flashe",
+      "damage": "Obrażenia"
+    },
+    "empty": "Brak danych o utility dla tego dema.",
+    "flash": {
+      "thrown": "Rzucone",
+      "enemiesBlinded": "Oślepieni wrogowie",
+      "duration": "Czas (s)",
+      "perThrow": "Oślepieni na rzut",
+      "perRound": "Oślepieni na rundę",
+      "matrixTitle": "Macierz oślepień",
+      "matrixHint": "Wiersz oślepił kolumnę: łączny czas w sekundach (z sojusznikami)",
+      "empty": "To demo nie ma danych o flashach (brak oślepień)."
+    },
+    "damage": {
+      "thrown": "Rzucone",
+      "total": "Obrażenia",
+      "perThrow": "Obrażenia na rzut",
+      "perRound": "Obrażenia na rundę",
+      "kills": "Zabójstwa",
+      "hint": "Obrażenia od HE i molotova (zabójstwa sprzętem)"
+    }
   },
   "heatmap": {
     "title": "Heatmapa",
