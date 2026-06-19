@@ -15,9 +15,27 @@ export interface Team {
   players: TeamPlayer[]
 }
 
-/** First-seen side per steamId in a round (sides are stable within a round). */
+/**
+ * Each player's side in a round, read from the live frames (after `startTick`).
+ *
+ * Live frames matter at the pistol round: when the match opens with a knife
+ * round, the side pick happens *during* the pistol round's freeze time, so its
+ * first frames still carry the knife-round sides before the swap. Reading the
+ * first frame would invert CT/T there. Live frames always carry the real round
+ * sides. First occurrence wins, so a player who dies early still gets a side.
+ *
+ * A second pass over every frame fills any player who never appears live (e.g.
+ * disconnected during freeze), so they still get a side instead of rendering
+ * gray; live frames already won for everyone present, so this never re-inverts.
+ */
 export function roundSides(round: Round): Map<string, Side> {
   const m = new Map<string, Side>()
+  for (const f of round.frames) {
+    if (f.tick < round.startTick) continue
+    for (const p of f.players) {
+      if (!m.has(p.steamId)) m.set(p.steamId, p.side)
+    }
+  }
   for (const f of round.frames) {
     for (const p of f.players) {
       if (!m.has(p.steamId)) m.set(p.steamId, p.side)

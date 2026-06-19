@@ -1,6 +1,7 @@
 import { computed, onUnmounted, ref, shallowRef } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import type { PlayerMeta, PlayerState, Replay, Round, Side } from '@/viewer/domain/schema'
+import { roundSides } from '@/viewer/analysis/utilityStats'
 
 /** Playback speeds offered in the controls. */
 export const SPEEDS = [1, 2, 4, 8] as const
@@ -173,19 +174,12 @@ export function useReplay() {
     return map
   })
 
-  /** Each player's side in the current round (constant within the round). Built
-   * from the union of all frames (first occurrence wins), not just the first
-   * frame: a player who is absent from frame 0 (e.g. already dead at the round's
-   * freeze/post-round edge) would otherwise have no side and render gray. */
-  const sideById = computed(() => {
-    const map = new Map<string, Side>()
-    for (const f of round.value?.frames ?? []) {
-      for (const p of f.players) {
-        if (!map.has(p.steamId)) map.set(p.steamId, p.side)
-      }
-    }
-    return map
-  })
+  /** Each player's side in the current round (constant within the round). Read
+   * from the live frames so the pistol round's post-knife side swap doesn't
+   * invert CT/T (see `roundSides`). */
+  const sideById = computed(() =>
+    round.value ? roundSides(round.value) : new Map<string, Side>(),
+  )
 
   /**
    * Knife round: some servers (FACEIT, scrims) open with a knife-only round to

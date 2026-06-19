@@ -4,6 +4,7 @@ import type { Replay, Round, Side } from '@/viewer/domain/schema'
 import { MAP_CALIBRATION } from '@/viewer/domain/calibration'
 import { SIDE_COLOR } from '@/viewer/domain/colors'
 import HeatmapPlot from '@/viewer/analysis/HeatmapPlot.vue'
+import { roundSides } from '@/viewer/analysis/utilityStats'
 import UiIcon from '@/ui/UiIcon.vue'
 import { useI18n } from '@/i18n'
 
@@ -38,22 +39,13 @@ const SOURCE_META: Record<Source, { labelKey: string; identity: boolean }> = {
 // detonations do not carry the thrower, so the filter is ignored for them.
 const hasIdentity = computed(() => SOURCE_META[source.value].identity)
 
-/** A player side in that round (read from the first frame that contains them). */
-const sideCache = new Map<string, Side | null>()
+/** A player's side in that round, from the live frames (so the pistol round's
+ *  post-knife side swap doesn't invert CT/T; see `roundSides`). Cached per round. */
+const sideCache = new Map<number, Map<string, Side>>()
 function sideInRound(round: Round, roundIdx: number, steamId: string): Side | null {
-  const key = `${roundIdx}:${steamId}`
-  const hit = sideCache.get(key)
-  if (hit !== undefined) return hit
-  let side: Side | null = null
-  for (const f of round.frames) {
-    const p = f.players.find((pl) => pl.steamId === steamId)
-    if (p) {
-      side = p.side
-      break
-    }
-  }
-  sideCache.set(key, side)
-  return side
+  let sides = sideCache.get(roundIdx)
+  if (!sides) sideCache.set(roundIdx, (sides = roundSides(round)))
+  return sides.get(steamId) ?? null
 }
 
 interface Pt {
