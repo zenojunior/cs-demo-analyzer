@@ -187,7 +187,17 @@
       "perRound": "Geblendet pro Runde",
       "matrixTitle": "Blend-Matrix",
       "matrixHint": "Zeile blendete Spalte: Gesamtdauer in Sekunden (Verbündete inbegriffen)",
-      "empty": "Dieses Demo hat keine Flash-Daten (keine Blend-Events)."
+      "empty": "Dieses Demo enthält keine Blend-Events. GOTV/HLTV-Demos (etwa von Majors) lassen diese Information meist weg, daher können keine Flash-Statistiken berechnet werden. Das ist kein Fehler.",
+      "impactTitle": "Flash-Wirkung",
+      "impactHint": "Geblendete Gegner, die geblendet durch deinen Flash starben (echter Nutzen)",
+      "killsFromBlinds": "Geblendete Kills",
+      "selfFlashKills": "Eigene Kills",
+      "flashAssists": "Flash-Assists",
+      "leverageRate": "Quote",
+      "playSelf": "Blendete und tötete {victim}",
+      "playAssist": "Blendete {victim}, {killer} tötete",
+      "matrixCell": "{flasher} blendete {victim}",
+      "emptyTitle": "Flash-Daten nicht verfügbar"
     },
     "damage": {
       "thrown": "Geworfen",
@@ -196,7 +206,8 @@
       "perRound": "Schaden pro Runde",
       "kills": "Kills",
       "hint": "Schaden durch HE und Molotov (Utility-Kills inbegriffen)"
-    }
+    },
+    "bestOfMatch": "Bester des Spiels"
   },
   "heatmap": {
     "title": "Heatmap",

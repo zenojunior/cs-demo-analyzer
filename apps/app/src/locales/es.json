@@ -187,7 +187,17 @@
       "perRound": "Cegados por ronda",
       "matrixTitle": "Matriz de ceguera",
       "matrixHint": "La fila cegó a la columna: duración total en segundos (incluye aliados)",
-      "empty": "Esta demo no tiene datos de flash (sin eventos de ceguera)."
+      "empty": "Esta demo no registra eventos de ceguera. Las demos de GOTV/HLTV (como las de Majors) suelen omitir esta información, por lo que no se pueden calcular las estadísticas de flash. No es un error.",
+      "impactTitle": "Impacto de las flashes",
+      "impactHint": "Enemigos cegados que murieron mientras estaban cegados por tu flash (rendimiento real)",
+      "killsFromBlinds": "Cegados eliminados",
+      "selfFlashKills": "Bajas propias",
+      "flashAssists": "Asistencias de flash",
+      "leverageRate": "Aprovechamiento",
+      "playSelf": "Cegó y eliminó a {victim}",
+      "playAssist": "Cegó a {victim}, {killer} eliminó",
+      "matrixCell": "{flasher} cegó a {victim}",
+      "emptyTitle": "Datos de flash no disponibles"
     },
     "damage": {
       "thrown": "Lanzadas",
@@ -196,7 +206,8 @@
       "perRound": "Daño por ronda",
       "kills": "Bajas",
       "hint": "Daño de HE y molotov (bajas con utilidad incluidas)"
-    }
+    },
+    "bestOfMatch": "Mejor de la partida"
   },
   "heatmap": {
     "title": "Heatmap",

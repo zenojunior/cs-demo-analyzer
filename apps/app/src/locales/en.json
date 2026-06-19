@@ -187,7 +187,17 @@
       "perRound": "Blinded per round",
       "matrixTitle": "Blind matrix",
       "matrixHint": "Row blinded column: total duration in seconds (allies included)",
-      "empty": "This demo has no flash data (no blind events)."
+      "empty": "This demo records no blind events. GOTV/HLTV demos (such as Majors) usually omit this information, so flash stats cannot be computed. This is not an error.",
+      "impactTitle": "Flash impact",
+      "impactHint": "Enemies blinded who died while blind from your flash (real payoff)",
+      "killsFromBlinds": "Blind enemies killed",
+      "selfFlashKills": "Own kills",
+      "flashAssists": "Flash assists",
+      "leverageRate": "Conversion",
+      "playSelf": "Blinded and killed {victim}",
+      "playAssist": "Blinded {victim}, {killer} killed",
+      "matrixCell": "{flasher} blinded {victim}",
+      "emptyTitle": "Flash data unavailable"
     },
     "damage": {
       "thrown": "Thrown",
@@ -196,7 +206,8 @@
       "perRound": "Damage per round",
       "kills": "Kills",
       "hint": "Damage from HE and molotov (utility kills included)"
-    }
+    },
+    "bestOfMatch": "Best of the match"
   },
   "heatmap": {
     "title": "Heatmap",

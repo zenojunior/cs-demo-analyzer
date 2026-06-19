@@ -187,7 +187,17 @@
       "perRound": "Tur başına kör",
       "matrixTitle": "Körlük matrisi",
       "matrixHint": "Satır sütunu kör etti: saniye cinsinden toplam süre (takım arkadaşları dahil)",
-      "empty": "Bu demoda flaş verisi yok (körlük olayı yok)."
+      "empty": "Bu demo körlük olaylarını kaydetmiyor. GOTV/HLTV demoları (Majorlar gibi) genelde bu bilgiyi içermez, bu yüzden flaş istatistikleri hesaplanamaz. Bu bir hata değil.",
+      "impactTitle": "Flaş etkisi",
+      "impactHint": "Flaşınla kör edilip kör haldeyken ölen düşmanlar (gerçek katkı)",
+      "killsFromBlinds": "Öldürülen körler",
+      "selfFlashKills": "Kendi öldürmeleri",
+      "flashAssists": "Flaş asistleri",
+      "leverageRate": "Dönüşüm",
+      "playSelf": "{victim} oyuncusunu kör edip öldürdü",
+      "playAssist": "{victim} kör edildi, {killer} öldürdü",
+      "matrixCell": "{flasher}, {victim} oyuncusunu kör etti",
+      "emptyTitle": "Flaş verisi yok"
     },
     "damage": {
       "thrown": "Atılan",
@@ -196,7 +206,8 @@
       "perRound": "Tur başına hasar",
       "kills": "Öldürme",
       "hint": "HE ve molotof hasarı (ekipman öldürmeleri dahil)"
-    }
+    },
+    "bestOfMatch": "Maçın en iyisi"
   },
   "heatmap": {
     "title": "Heatmap",

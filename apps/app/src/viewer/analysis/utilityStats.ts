@@ -49,12 +49,48 @@ export interface FlashStat {
   enemiesBlinded: number
   /** Total blind seconds inflicted on enemies. */
   enemyBlindDuration: number
+  /** Enemies blinded by this player who were killed while still blind (the
+   *  flash had a real impact). Sum of the two below. */
+  killsFromBlinds: number
+  /** ...killed by the flasher themselves (blinded then fragged). */
+  selfFlashKills: number
+  /** ...killed by a teammate of the flasher (a flash that set up the kill). */
+  flashAssists: number
+}
+
+/** A drill-down line shown in a grid cell's popover (one play). */
+export interface CellDetail {
+  key: string
+  /** Main line (e.g. what happened). */
+  text: string
+  /** Secondary line (e.g. round, time, weapon). */
+  sub?: string
+  /** Replay seek target, when the line is clickable. */
+  jump?: { roundIndex: number; t: number }
+}
+
+/** A single flash that led to a kill, for the drill-down popover. */
+export interface FlashPlay {
+  roundNumber: number
+  roundIndex: number
+  /** Blind start (seconds since freeze) of the flash, used to seek the replay. */
+  blindT: number
+  /** Moment the blinded victim was killed (seconds since freeze). */
+  killT: number
+  victimSteamId: string
+  killerSteamId: string
+  /** Kill-event weapon code (e.g. "ak47"). */
+  weapon: string
+  /** 'self' = the flasher fragged the blind victim; 'assist' = a teammate did. */
+  type: 'self' | 'assist'
 }
 
 export interface FlashStats {
   byPlayer: Map<string, FlashStat>
   /** flasher steamId -> victim steamId -> total blind seconds (allies included). */
   matrix: Map<string, Map<string, number>>
+  /** flasher steamId -> the plays behind their killsFromBlinds, in time order. */
+  playsByPlayer: Map<string, FlashPlay[]>
   roundCount: number
 }
 
@@ -62,13 +98,25 @@ export interface FlashStats {
 export function computeFlashStats(replay: Replay): FlashStats {
   const byPlayer = new Map<string, FlashStat>()
   const matrix = new Map<string, Map<string, number>>()
+  const playsByPlayer = new Map<string, FlashPlay[]>()
   const stat = (id: string): FlashStat => {
     let s = byPlayer.get(id)
-    if (!s) byPlayer.set(id, (s = { thrown: 0, enemiesBlinded: 0, enemyBlindDuration: 0 }))
+    if (!s)
+      byPlayer.set(
+        id,
+        (s = {
+          thrown: 0,
+          enemiesBlinded: 0,
+          enemyBlindDuration: 0,
+          killsFromBlinds: 0,
+          selfFlashKills: 0,
+          flashAssists: 0,
+        }),
+      )
     return s
   }
 
-  for (const round of replay.rounds) {
+  replay.rounds.forEach((round, roundIndex) => {
     for (const path of round.grenadePaths) {
       if (path.kind === 'flash' && path.throwerSteamId) stat(path.throwerSteamId).thrown += 1
     }
@@ -89,9 +137,50 @@ export function computeFlashStats(replay: Replay): FlashStats {
         s.enemyBlindDuration += b.duration
       }
     }
-  }
 
-  return { byPlayer, matrix, roundCount: replay.rounds.length }
+    // Flash impact: an enemy killed while still blinded credits the flasher.
+    // Each kill is attributed to at most one flash (the most recent active one
+    // on the victim) to avoid double counting, and only when the flasher is on
+    // the killer's team (a team flash that got someone killed does not count).
+    for (const e of round.events) {
+      if (e.type !== 'kill') continue
+      const kill = e as KillEvent
+      const killer = kill.attackerSteamId
+      if (!killer) continue
+      let best: { flasher: string; t: number } | null = null
+      for (const b of round.blinds) {
+        if (b.steamId !== kill.victimSteamId || !b.flasherSteamId) continue
+        if (kill.t >= b.t && kill.t <= b.t + b.duration && (!best || b.t > best.t)) {
+          best = { flasher: b.flasherSteamId, t: b.t }
+        }
+      }
+      if (!best) continue
+      const fSide = sides.get(best.flasher)
+      const kSide = sides.get(killer)
+      const vSide = sides.get(kill.victimSteamId)
+      if (fSide && kSide && fSide === kSide && vSide && vSide !== fSide) {
+        const s = stat(best.flasher)
+        s.killsFromBlinds += 1
+        const type: 'self' | 'assist' = best.flasher === killer ? 'self' : 'assist'
+        if (type === 'self') s.selfFlashKills += 1
+        else s.flashAssists += 1
+        let plays = playsByPlayer.get(best.flasher)
+        if (!plays) playsByPlayer.set(best.flasher, (plays = []))
+        plays.push({
+          roundNumber: round.number,
+          roundIndex,
+          blindT: best.t,
+          killT: kill.t,
+          victimSteamId: kill.victimSteamId,
+          killerSteamId: killer,
+          weapon: kill.weapon,
+          type,
+        })
+      }
+    }
+  })
+
+  return { byPlayer, matrix, playsByPlayer, roundCount: replay.rounds.length }
 }
 
 export interface DamageStat {

@@ -187,7 +187,17 @@
       "perRound": "Aveuglés par manche",
       "matrixTitle": "Matrice d’aveuglement",
       "matrixHint": "La ligne a aveuglé la colonne : durée totale en secondes (alliés inclus)",
-      "empty": "Cette démo n’a aucune donnée de flash (aucun aveuglement)."
+      "empty": "Cette démo n’enregistre aucun événement d’aveuglement. Les démos GOTV/HLTV (comme celles des Majors) omettent généralement cette information, les stats de flash ne peuvent donc pas être calculées. Ce n’est pas une erreur.",
+      "impactTitle": "Impact des flashs",
+      "impactHint": "Ennemis aveuglés tués pendant qu’ils étaient aveuglés par votre flash (efficacité réelle)",
+      "killsFromBlinds": "Aveuglés éliminés",
+      "selfFlashKills": "Éliminations propres",
+      "flashAssists": "Assists de flash",
+      "leverageRate": "Conversion",
+      "playSelf": "A aveuglé et tué {victim}",
+      "playAssist": "A aveuglé {victim}, {killer} a tué",
+      "matrixCell": "{flasher} a aveuglé {victim}",
+      "emptyTitle": "Données de flash indisponibles"
     },
     "damage": {
       "thrown": "Lancées",
@@ -196,7 +206,8 @@
       "perRound": "Dégâts par manche",
       "kills": "Éliminations",
       "hint": "Dégâts de HE et molotov (éliminations à l’utilitaire incluses)"
-    }
+    },
+    "bestOfMatch": "Meilleur du match"
   },
   "heatmap": {
     "title": "Heatmap",

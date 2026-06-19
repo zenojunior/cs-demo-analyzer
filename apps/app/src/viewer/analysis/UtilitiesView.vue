@@ -53,7 +53,11 @@ const SUBS: Sub[] = ['throws', 'flashes', 'damage']
         :players-by-id="props.playersById"
         @jump="(p) => emit('jump', p)"
       />
-      <UtilityFlashesView v-else-if="sub === 'flashes'" :replay="props.replay" />
+      <UtilityFlashesView
+        v-else-if="sub === 'flashes'"
+        :replay="props.replay"
+        @jump="(p) => emit('jump', p)"
+      />
       <UtilityDamageView v-else :replay="props.replay" />
     </div>
   </div>

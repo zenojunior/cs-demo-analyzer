@@ -187,7 +187,17 @@
       "perRound": "Oślepieni na rundę",
       "matrixTitle": "Macierz oślepień",
       "matrixHint": "Wiersz oślepił kolumnę: łączny czas w sekundach (z sojusznikami)",
-      "empty": "To demo nie ma danych o flashach (brak oślepień)."
+      "empty": "To demo nie rejestruje zdarzeń oślepienia. Dema GOTV/HLTV (np. z Majorów) zwykle pomijają tę informację, więc statystyk flashy nie da się obliczyć. To nie jest błąd.",
+      "impactTitle": "Wpływ flashy",
+      "impactHint": "Oślepieni wrogowie, którzy zginęli oślepieni twoim flashem (realny efekt)",
+      "killsFromBlinds": "Zabici oślepieni",
+      "selfFlashKills": "Własne zabójstwa",
+      "flashAssists": "Asysty z flasha",
+      "leverageRate": "Skuteczność",
+      "playSelf": "Oślepił i zabił {victim}",
+      "playAssist": "Oślepił {victim}, {killer} zabił",
+      "matrixCell": "{flasher} oślepił {victim}",
+      "emptyTitle": "Brak danych o flashach"
     },
     "damage": {
       "thrown": "Rzucone",
@@ -196,7 +206,8 @@
       "perRound": "Obrażenia na rundę",
       "kills": "Zabójstwa",
       "hint": "Obrażenia od HE i molotova (zabójstwa sprzętem)"
-    }
+    },
+    "bestOfMatch": "Najlepszy w meczu"
   },
   "heatmap": {
     "title": "Heatmapa",
