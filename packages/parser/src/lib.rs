@@ -87,6 +87,10 @@ struct Round {
     t_name: String,
     /// Health damage per player (steamId -> total) in this round.
     damage: HashMap<String, i32>,
+    /// Utility (HE + molotov/incendiary) health damage per player (steamId ->
+    /// total) in this round. A subset of `damage`, kept separately for the
+    /// utility impact view.
+    utility_damage: HashMap<String, i32>,
     frames: Vec<Frame>,
     events: Vec<Event>,
     bomb: Vec<BombKeyframe>,
@@ -249,11 +253,26 @@ struct GrenadePoint {
 struct Blind {
     t: f64,
     duration: f64,
+    /// The blinded player (victim).
     steam_id: String,
+    /// Who threw the flash, resolved from the event's attacker pawn (None when
+    /// the parser could not resolve it). Lets the impact view attribute
+    /// "enemies flashed" to a player.
+    flasher_steam_id: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {
     !*b
+}
+
+/// Whether a `player_hurt` weapon classname is a damaging grenade: HE grenade or
+/// molotov/incendiary (burn damage reports as "inferno"). Smokes/flashes/decoys
+/// deal no health damage, so they never reach here.
+fn is_utility_weapon(weapon: &str) -> bool {
+    weapon.contains("hegrenade")
+        || weapon.contains("inferno")
+        || weapon.contains("molotov")
+        || weapon.contains("incgrenade")
 }
 
 // ------------------------------------------------------- accumulators ---
@@ -373,12 +392,14 @@ struct Collector {
     final_score: Option<(i32, i32)>,
     /// Final team names (CT, T), read at the end of the match.
     final_names: Option<(String, String)>,
-    /// Damage: (tick, attacker steamId, health damage). Aggregated per round at build.
-    hurts: Vec<(u32, String, i32)>,
+    /// Damage: (tick, attacker steamId, health damage, weapon classname lowercased).
+    /// The weapon lets the build split out utility damage. Aggregated per round.
+    hurts: Vec<(u32, String, i32, String)>,
     /// Shots (tracers): (tick, x, y, yaw) of the shooter.
     shots: Vec<(u32, f64, f64, f64)>,
-    /// Blinds: (tick, userid, duration). The steamId comes from the userid->steam map.
-    blinds_raw: Vec<(u32, i32, f64)>,
+    /// Blinds: (tick, userid, duration, flasher steamId). The victim steamId comes
+    /// from the userid->steam map; the flasher is resolved from the attacker pawn.
+    blinds_raw: Vec<(u32, i32, f64, Option<String>)>,
     /// Chat: (tick, name, text, team-only). The steamId is resolved by name at build.
     chats: Vec<(u32, String, String, bool)>,
     /// Defuse start: (tick, userid, has_kit). steamId resolved via userid.
@@ -1105,7 +1126,8 @@ impl Collector {
                     return Ok(());
                 }
                 if let Some(s) = atk.and_then(|h| steam_from_pawn_handle(self, ctx, h)) {
-                    self.hurts.push((tick, s, dmg));
+                    let weapon = ev_str(ge, "weapon").unwrap_or_default().to_lowercase();
+                    self.hurts.push((tick, s, dmg, weapon));
                 }
             }
             "player_death" => {
@@ -1212,7 +1234,12 @@ impl Collector {
                 let dur = ev_f32(ge, "blind_duration");
                 if dur > 0.0 {
                     if let Some(uid) = ev_i32(ge, "userid") {
-                        self.blinds_raw.push((tick, uid, dur));
+                        // Flasher: player_blind carries the thrower as `attacker` (a
+                        // userid, not a pawn handle, unlike player_hurt), resolved
+                        // via the same userid -> steam bridge as the victim.
+                        let flasher = ev_i32(ge, "attacker")
+                            .and_then(|u| self.userid_to_steam.get(&u).cloned());
+                        self.blinds_raw.push((tick, uid, dur, flasher));
                     }
                 }
             }
@@ -1268,6 +1295,7 @@ fn build_replay(c: &Collector) -> Replay {
             ct_name,
             t_name,
             damage: HashMap::new(),
+            utility_damage: HashMap::new(),
             frames: Vec::new(),
             events: Vec::new(),
             bomb: Vec::new(),
@@ -1430,6 +1458,7 @@ fn build_replay(c: &Collector) -> Replay {
                 ct_name,
                 t_name,
                 damage: HashMap::new(),
+                utility_damage: HashMap::new(),
                 frames: Vec::new(),
                 events: Vec::new(),
                 bomb: Vec::new(),
@@ -1633,15 +1662,17 @@ fn build_replay(c: &Collector) -> Replay {
         }
     }
 
-    // Flash blinds (steamId resolved via the userid -> steam map).
-    for &(tick, uid, dur) in &c.blinds_raw {
-        if let Some(idx) = round_of(tick, &rounds) {
-            if let Some(steam) = c.userid_to_steam.get(&uid) {
+    // Flash blinds (victim steamId resolved via the userid -> steam map; the
+    // flasher steamId is already resolved at event time).
+    for (tick, uid, dur, flasher) in &c.blinds_raw {
+        if let Some(idx) = round_of(*tick, &rounds) {
+            if let Some(steam) = c.userid_to_steam.get(uid) {
                 let start = rounds[idx].freeze_start_tick;
                 rounds[idx].blinds.push(Blind {
-                    t: round1((tick as f64 - start as f64) / DEMO_TICK_RATE),
-                    duration: round1(dur),
+                    t: round1((*tick as f64 - start as f64) / DEMO_TICK_RATE),
+                    duration: round1(*dur),
                     steam_id: steam.clone(),
+                    flasher_steam_id: flasher.clone(),
                 });
             }
         }
@@ -1720,10 +1751,14 @@ fn build_replay(c: &Collector) -> Replay {
         });
     }
 
-    // Damage per round and player (for ADR/DMG on the scoreboard).
-    for (tick, steam, dmg) in &c.hurts {
+    // Damage per round and player (for ADR/DMG on the scoreboard). Utility damage
+    // (HE + molotov/incendiary) is also tallied separately for the impact view.
+    for (tick, steam, dmg, weapon) in &c.hurts {
         if let Some(idx) = round_of(*tick, &rounds) {
             *rounds[idx].damage.entry(steam.clone()).or_insert(0) += *dmg;
+            if is_utility_weapon(weapon) {
+                *rounds[idx].utility_damage.entry(steam.clone()).or_insert(0) += *dmg;
+            }
         }
     }
 

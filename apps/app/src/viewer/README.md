@@ -31,7 +31,9 @@ router.ts
        │    useVoicePlayback / voiceCodec   in-game comms audio
        │
        ├─ analysis/              stat tabs computed from the Replay
-       │    EconomyView (roundEconomy) · GrenadesView · HeatmapView (HeatmapPlot)
+       │    EconomyView (roundEconomy) · HeatmapView (HeatmapPlot)
+       │    UtilitiesView (sub-nav) → UtilityThrowsView · UtilityFlashesView · UtilityDamageView
+       │      flashes/damage share UtilityTeamGrid + utilityStats (pure aggregation)
        │
        └─ comments/              replay annotations
             CommentsPanel / CommentPopover · useComments · commentAnchor / commentKinds

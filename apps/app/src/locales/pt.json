@@ -48,6 +48,7 @@
     "replay": "Replay 2D",
     "heatmaps": "Heatmaps",
     "grenades": "Granadas",
+    "utilities": "Utilitárias",
     "economy": "Economia"
   },
   "analyzer": {
@@ -161,17 +162,52 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Granadas",
     "data": "Tipo",
     "all": "Todas",
     "side": "Lado",
     "both": "Ambos",
     "player": "Jogador",
     "allPlayers": "Todos os jogadores",
-    "currentRoundOnly": "Só o round atual",
     "empty": "Nenhuma granada para os filtros atuais.",
     "unknown": "Desconhecido",
     "hint": "Passe o mouse sobre uma granada para isolar a trajetória · clique para abrir no replay"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Lançamentos",
+      "flashes": "Flashes",
+      "damage": "Dano"
+    },
+    "empty": "Sem dados de utilitárias para esta demo.",
+    "flash": {
+      "thrown": "Lançadas",
+      "enemiesBlinded": "Inimigos cegados",
+      "duration": "Duração (s)",
+      "perThrow": "Cegados por lançamento",
+      "perRound": "Cegados por rodada",
+      "matrixTitle": "Matriz de cegueira",
+      "matrixHint": "A linha cegou a coluna: soma da duração em segundos (inclui aliados)",
+      "empty": "Esta demo não registra eventos de cegueira. Demos de GOTV/HLTV (como as de Majors) normalmente não incluem essa informação, então as estatísticas de flash não podem ser calculadas. Não é um erro.",
+      "impactTitle": "Impacto das flashes",
+      "impactHint": "Inimigos cegados que morreram enquanto cegos pela sua flash (aproveitamento real)",
+      "killsFromBlinds": "Cegos eliminados",
+      "selfFlashKills": "Eliminações próprias",
+      "flashAssists": "Assistências de flash",
+      "leverageRate": "Aproveitamento",
+      "playSelf": "Cegou e eliminou {victim}",
+      "playAssist": "Cegou {victim}, {killer} eliminou",
+      "matrixCell": "{flasher} cegou {victim}",
+      "emptyTitle": "Dados de flash indisponíveis"
+    },
+    "damage": {
+      "thrown": "Lançadas",
+      "total": "Dano",
+      "perThrow": "Dano por lançamento",
+      "perRound": "Dano por rodada",
+      "kills": "Eliminações",
+      "hint": "Dano causado por HE e molotov (eliminações por utilitárias)"
+    },
+    "bestOfMatch": "Melhor da partida"
   },
   "heatmap": {
     "title": "Heatmap",

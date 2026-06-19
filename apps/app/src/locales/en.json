@@ -48,6 +48,7 @@
     "replay": "2D Replay",
     "heatmaps": "Heatmaps",
     "grenades": "Grenades",
+    "utilities": "Utilities",
     "economy": "Economy"
   },
   "analyzer": {
@@ -161,17 +162,52 @@
     "decoy": "Decoy"
   },
   "grenades": {
-    "title": "Grenades",
     "data": "Type",
     "all": "All",
     "side": "Side",
     "both": "Both",
     "player": "Player",
     "allPlayers": "All players",
-    "currentRoundOnly": "Current round only",
     "empty": "No grenades for the current filters.",
     "unknown": "Unknown",
     "hint": "Hover a grenade to isolate its trajectory · click to open it in the replay"
+  },
+  "utilities": {
+    "tabs": {
+      "throws": "Throws",
+      "flashes": "Flashes",
+      "damage": "Damage"
+    },
+    "empty": "No utility data for this demo.",
+    "flash": {
+      "thrown": "Thrown",
+      "enemiesBlinded": "Enemies blinded",
+      "duration": "Duration (s)",
+      "perThrow": "Blinded per throw",
+      "perRound": "Blinded per round",
+      "matrixTitle": "Blind matrix",
+      "matrixHint": "Row blinded column: total duration in seconds (allies included)",
+      "empty": "This demo records no blind events. GOTV/HLTV demos (such as Majors) usually omit this information, so flash stats cannot be computed. This is not an error.",
+      "impactTitle": "Flash impact",
+      "impactHint": "Enemies blinded who died while blind from your flash (real payoff)",
+      "killsFromBlinds": "Blind enemies killed",
+      "selfFlashKills": "Own kills",
+      "flashAssists": "Flash assists",
+      "leverageRate": "Conversion",
+      "playSelf": "Blinded and killed {victim}",
+      "playAssist": "Blinded {victim}, {killer} killed",
+      "matrixCell": "{flasher} blinded {victim}",
+      "emptyTitle": "Flash data unavailable"
+    },
+    "damage": {
+      "thrown": "Thrown",
+      "total": "Damage",
+      "perThrow": "Damage per throw",
+      "perRound": "Damage per round",
+      "kills": "Kills",
+      "hint": "Damage from HE and molotov (utility kills included)"
+    },
+    "bestOfMatch": "Best of the match"
   },
   "heatmap": {
     "title": "Heatmap",
