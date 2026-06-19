@@ -27,6 +27,38 @@ export function roundSides(round: Round): Map<string, Side> {
 }
 
 /**
+ * The flash that set up a kill: the most recent blind still active on the victim
+ * at the moment of death, thrown by someone on the killer's team against an
+ * enemy. Returns the flasher (which may be the killer themselves, a self-flash)
+ * and the blind start, or null when no flash set up the kill.
+ *
+ * This is the demo-independent definition of a flash assist, used both by the
+ * Utilities stats and to surface the killfeed icon when the demo never set the
+ * `assistedFlash` flag on `player_death` (some community/tournament servers).
+ */
+export function flashSetupForKill(
+  round: Round,
+  kill: KillEvent,
+  sides: Map<string, Side>,
+): { flasher: string; blindT: number } | null {
+  const killer = kill.attackerSteamId
+  if (!killer) return null
+  let best: { flasher: string; blindT: number } | null = null
+  for (const b of round.blinds) {
+    if (b.steamId !== kill.victimSteamId || !b.flasherSteamId) continue
+    if (kill.t >= b.t && kill.t <= b.t + b.duration && (!best || b.t > best.blindT)) {
+      best = { flasher: b.flasherSteamId, blindT: b.t }
+    }
+  }
+  if (!best) return null
+  const fSide = sides.get(best.flasher)
+  const kSide = sides.get(killer)
+  const vSide = sides.get(kill.victimSteamId)
+  if (fSide && kSide && fSide === kSide && vSide && vSide !== fSide) return best
+  return null
+}
+
+/**
  * Splits the match players into the two teams by their starting side, naming each
  * from the first round's clan names. Players are listed in the replay's order.
  */
@@ -147,36 +179,25 @@ export function computeFlashStats(replay: Replay): FlashStats {
       const kill = e as KillEvent
       const killer = kill.attackerSteamId
       if (!killer) continue
-      let best: { flasher: string; t: number } | null = null
-      for (const b of round.blinds) {
-        if (b.steamId !== kill.victimSteamId || !b.flasherSteamId) continue
-        if (kill.t >= b.t && kill.t <= b.t + b.duration && (!best || b.t > best.t)) {
-          best = { flasher: b.flasherSteamId, t: b.t }
-        }
-      }
+      const best = flashSetupForKill(round, kill, sides)
       if (!best) continue
-      const fSide = sides.get(best.flasher)
-      const kSide = sides.get(killer)
-      const vSide = sides.get(kill.victimSteamId)
-      if (fSide && kSide && fSide === kSide && vSide && vSide !== fSide) {
-        const s = stat(best.flasher)
-        s.killsFromBlinds += 1
-        const type: 'self' | 'assist' = best.flasher === killer ? 'self' : 'assist'
-        if (type === 'self') s.selfFlashKills += 1
-        else s.flashAssists += 1
-        let plays = playsByPlayer.get(best.flasher)
-        if (!plays) playsByPlayer.set(best.flasher, (plays = []))
-        plays.push({
-          roundNumber: round.number,
-          roundIndex,
-          blindT: best.t,
-          killT: kill.t,
-          victimSteamId: kill.victimSteamId,
-          killerSteamId: killer,
-          weapon: kill.weapon,
-          type,
-        })
-      }
+      const s = stat(best.flasher)
+      s.killsFromBlinds += 1
+      const type: 'self' | 'assist' = best.flasher === killer ? 'self' : 'assist'
+      if (type === 'self') s.selfFlashKills += 1
+      else s.flashAssists += 1
+      let plays = playsByPlayer.get(best.flasher)
+      if (!plays) playsByPlayer.set(best.flasher, (plays = []))
+      plays.push({
+        roundNumber: round.number,
+        roundIndex,
+        blindT: best.blindT,
+        killT: kill.t,
+        victimSteamId: kill.victimSteamId,
+        killerSteamId: killer,
+        weapon: kill.weapon,
+        type,
+      })
     }
   })
 
