@@ -73,7 +73,10 @@
     "import": "Dışa aktarılmış replay'i aç (.cs2dv)",
     "importHint": "Bu uygulamadan dışa aktarılmış bir .cs2dv dosyası",
     "importing": "Replay içe aktarılıyor...",
-    "importError": "Bu dosya içe aktarılamadı."
+    "importError": "Bu dosya içe aktarılamadı.",
+    "extConnecting": "Uzantıya bağlanılıyor...",
+    "extDownloading": "Demo indiriliyor...",
+    "extDownloadError": "Demo indirilemedi."
   },
   "viewer": {
     "round": "Raunt",

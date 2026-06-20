@@ -1,0 +1,29 @@
+@import 'tailwindcss';
+
+/* shadcn-vue design tokens (dark, matching the app's ink/surge palette). Scoped
+   to the shadow root host so nothing leaks to or from the Faceit page. */
+@theme {
+  --color-border: #2a2a33;
+  --color-input: #2a2a33;
+  --color-ring: #fdac1a;
+  --color-background: #15151a;
+  --color-foreground: #e8e8ee;
+  --color-card: #1b1b22;
+  --color-card-foreground: #e8e8ee;
+  /* Brand amber (the app's `surge-500` / icon color); dark text reads on it. */
+  --color-primary: #fdac1a;
+  --color-primary-foreground: #15151a;
+  --color-secondary: #23232b;
+  --color-secondary-foreground: #e8e8ee;
+  --color-muted: #23232b;
+  --color-muted-foreground: #9a9aa6;
+  --color-accent: #23232b;
+  --color-accent-foreground: #e8e8ee;
+  --color-destructive: #ff6b6b;
+  --color-destructive-foreground: #ffffff;
+  --radius: 0.6rem;
+}
+
+:host {
+  color-scheme: dark;
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@cs2/replay-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Framework-free CS2 replay pipeline shared by the web app and the browser extension: the normalized replay schema, voice (Opus) codec, and the .cs2dv archive format.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./voiceCodec": "./src/voiceCodec.ts",
+    "./demoArchive": "./src/demoArchive.ts"
+  }
+}
