@@ -69,7 +69,7 @@ provide(appFullscreenKey, { isFullscreen, toggle })
 
       <div class="flex items-center gap-2 text-xs text-ink-400 sm:gap-3">
         <RouterLink
-          to="/about"
+          to="/project"
           :aria-label="t('shell.about')"
           class="flex cursor-pointer items-center gap-1.5 rounded-md border border-ink-700 bg-ink-900/60 px-2 py-1 text-ink-200 transition-colors hover:bg-ink-800"
         >
