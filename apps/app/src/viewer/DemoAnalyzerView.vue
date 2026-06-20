@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UiIcon from '@/ui/UiIcon.vue'
 import ViewerStage from '@/viewer/player/ViewerStage.vue'
@@ -11,6 +11,7 @@ import { useDemoParser } from '@/viewer/ingest/useDemoParser'
 import { useRecentDemos, type RecentDemo } from '@/viewer/ingest/useRecentDemos'
 import { importArchive } from '@/viewer/ingest/demoArchive'
 import { fetchReplay } from '@/viewer/ingest/replaySource'
+import { listenForExtensionDemo } from '@/viewer/ingest/extensionBridge'
 import { MAP_CALIBRATION } from '@/viewer/domain/calibration'
 import { useI18n } from '@/i18n'
 
@@ -141,6 +142,11 @@ function pickImport() {
 async function onFiles(files: FileList | null | undefined) {
   const file = files?.[0]
   if (!file) return
+  await handleFile(file)
+}
+
+/** Ingests a single demo File (from the dropzone, file picker, or the extension). */
+async function handleFile(file: File) {
   // A `.cs2dv` is an exported, already-parsed replay: import it (no re-parsing).
   if (/\.cs2dv$/i.test(file.name)) {
     await onImportArchive(file)
@@ -273,6 +279,45 @@ watch(
   { immediate: true },
 )
 
+// A companion browser extension (Faceit "Open in 2D") can hand a freshly
+// downloaded demo straight to the analyzer over window.postMessage; we feed it
+// through the same ingest path as a local file. While the extension downloads
+// the demo from Faceit's CDN we show a progress overlay in this tab (the same
+// surface the parser progress uses), so the wait isn't a blank page.
+type ExtDownload =
+  | { phase: 'connecting' }
+  | { phase: 'downloading'; loaded: number; total: number }
+  | { phase: 'error'; message: string }
+const extDownload = ref<ExtDownload | null>(null)
+// Download percentage (0 when the CDN didn't send a Content-Length).
+const extPct = computed(() => {
+  const d = extDownload.value
+  if (d?.phase !== 'downloading' || !d.total) return 0
+  return Math.round((d.loaded / d.total) * 100)
+})
+let stopExtensionBridge: (() => void) | null = null
+onMounted(() => {
+  // Opened by the extension: show feedback before the first byte even arrives.
+  if (route.query.fromExtension) extDownload.value = { phase: 'connecting' }
+  stopExtensionBridge = listenForExtensionDemo({
+    onDownloadStart: (total) => {
+      extDownload.value = { phase: 'downloading', loaded: 0, total }
+    },
+    onDownloadProgress: (loaded, total) => {
+      extDownload.value = { phase: 'downloading', loaded, total }
+    },
+    onDownloadError: (message) => {
+      extDownload.value = { phase: 'error', message }
+    },
+    onDemo: (file) => {
+      // Bytes are in: hand off to the parser (its own overlay takes over).
+      extDownload.value = null
+      void handleFile(file)
+    },
+  })
+})
+onUnmounted(() => stopExtensionBridge?.())
+
 function onDrop(e: DragEvent) {
   dragging.value = false
   void onFiles(e.dataTransfer?.files)
@@ -386,6 +431,52 @@ function fmtDate(ms: number) {
         </div>
       </Teleport>
     </template>
+
+    <!-- Extension download state: the companion extension is fetching the demo
+         from Faceit's CDN. Same visual language as the parser overlay below. -->
+    <div
+      v-else-if="extDownload"
+      class="flex h-full flex-col items-center justify-center gap-4 px-6 text-center"
+    >
+      <UiIcon
+        :name="extDownload.phase === 'error' ? 'info' : 'loader'"
+        class="h-10 w-10"
+        :class="extDownload.phase === 'error' ? 'text-red-400' : 'animate-spin text-surge-400'"
+      />
+      <div>
+        <p class="font-display text-lg text-ink-50">
+          {{
+            extDownload.phase === 'error'
+              ? t('analyzer.extDownloadError')
+              : extDownload.phase === 'downloading'
+                ? t('analyzer.extDownloading')
+                : t('analyzer.extConnecting')
+          }}
+        </p>
+        <p v-if="extDownload.phase === 'error'" class="mt-1 max-w-sm font-mono text-xs text-ink-500">
+          {{ extDownload.message }}
+        </p>
+        <p
+          v-else-if="extDownload.phase === 'downloading' && !extDownload.total"
+          class="mt-1 font-mono text-xs text-ink-500"
+        >
+          {{ fmtSize(extDownload.loaded) }}
+        </p>
+      </div>
+
+      <!-- Real bar when the CDN sent a Content-Length; otherwise just the spinner. -->
+      <div v-if="extDownload.phase === 'downloading' && extDownload.total" class="w-full max-w-sm">
+        <div class="h-1.5 w-full overflow-hidden rounded-full bg-ink-800">
+          <div
+            class="h-full rounded-full bg-surge-400 transition-all duration-300 ease-out"
+            :style="{ width: `${extPct}%` }"
+          />
+        </div>
+        <p class="mt-1.5 text-right font-mono text-xs text-ink-500">{{ extPct }}%</p>
+      </div>
+
+      <p class="max-w-sm text-xs text-ink-500">{{ t('analyzer.localNote') }}</p>
+    </div>
 
     <!-- Processing state (new parse or opening a demo via the URL) -->
     <div

@@ -73,7 +73,10 @@
     "import": "Abrir replay exportado (.cs2dv)",
     "importHint": "Archivo .cs2dv exportado de esta app",
     "importing": "Importando replay...",
-    "importError": "No se pudo importar este archivo."
+    "importError": "No se pudo importar este archivo.",
+    "extConnecting": "Conectando con la extensión...",
+    "extDownloading": "Descargando la demo...",
+    "extDownloadError": "No se pudo descargar la demo."
   },
   "viewer": {
     "round": "Ronda",

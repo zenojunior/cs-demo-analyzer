@@ -73,7 +73,10 @@
     "import": "Otwórz wyeksportowaną powtórkę (.cs2dv)",
     "importHint": "Plik .cs2dv wyeksportowany z tej aplikacji",
     "importing": "Importowanie powtórki...",
-    "importError": "Nie udało się zaimportować tego pliku."
+    "importError": "Nie udało się zaimportować tego pliku.",
+    "extConnecting": "Łączenie z rozszerzeniem...",
+    "extDownloading": "Pobieranie dema...",
+    "extDownloadError": "Nie udało się pobrać dema."
   },
   "viewer": {
     "round": "Runda",
