@@ -132,9 +132,12 @@ export const MATCHES: MajorMatch[] = [
     teamB: 'furia',
     sourceA: 'qf1',
     sourceB: 'qf2',
-    scoreA: null,
-    scoreB: null,
-    maps: [],
+    scoreA: 0,
+    scoreB: 2,
+    maps: [
+      { map: 'de_dust2', replay: `${REPLAY_DIR}/sf1-dust2.cs2dv` },
+      { map: 'de_nuke', replay: `${REPLAY_DIR}/sf1-nuke.cs2dv` },
+    ],
   },
   {
     id: 'sf2',
