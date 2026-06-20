@@ -5,7 +5,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 // segment selects a sub-view (`heatmaps` / `grenades`), the 2D replay otherwise.
 const routes: RouteRecordRaw[] = [
   {
-    path: '/about',
+    path: '/project',
     name: 'about',
     component: () => import('@/pages/AboutPage.vue'),
   },
