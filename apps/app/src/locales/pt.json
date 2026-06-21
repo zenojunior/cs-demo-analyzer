@@ -68,6 +68,9 @@
     "contactTitle": "Contato",
     "contactBody": "Dúvidas sobre privacidade? Fale comigo em {email}."
   },
+  "seo": {
+    "appDescription": "Visualizador de replay 2D para demos de Counter-Strike 2 que roda inteiramente no seu navegador: suas demos nunca saem da sua máquina."
+  },
   "tabs": {
     "replay": "Replay 2D",
     "heatmaps": "Heatmaps",

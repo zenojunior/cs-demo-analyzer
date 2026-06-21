@@ -11,10 +11,13 @@
       name="description"
       content="Powerful 2D replay viewer for CS2 demos. Everything is processed locally in your browser: your demos never leave your machine."
     />
+    <link rel="canonical" href="https://cs2.zenojunior.com/" />
 
     <!-- Open Graph / social sharing. og:image must be an absolute URL. -->
     <meta property="og:url" content="https://cs2.zenojunior.com/" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CS Demo Analyzer" />
+    <meta property="og:locale" content="pt_BR" />
     <meta property="og:title" content="CS Demo Analyzer" />
     <meta
       property="og:description"
@@ -39,6 +42,24 @@
       href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Structured data: free, browser-based tool (rich results / discovery). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "CS Demo Analyzer",
+        "url": "https://cs2.zenojunior.com/",
+        "description": "Powerful 2D replay viewer for CS2 demos. Everything is processed locally in your browser: your demos never leave your machine.",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires JavaScript and WebAssembly",
+        "inLanguage": ["pt-BR", "en", "es", "fr", "de", "ru", "pl", "tr", "uk"],
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Zeno Junior", "url": "https://zenojunior.com" }
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

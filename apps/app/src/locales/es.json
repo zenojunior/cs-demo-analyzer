@@ -68,6 +68,9 @@
     "contactTitle": "Contacto",
     "contactBody": "¿Dudas sobre privacidad? Escríbeme a {email}."
   },
+  "seo": {
+    "appDescription": "Visor de repeticiones 2D para demos de Counter-Strike 2 que funciona por completo en tu navegador: tus demos nunca salen de tu equipo."
+  },
   "tabs": {
     "replay": "Replay 2D",
     "heatmaps": "Heatmaps",
