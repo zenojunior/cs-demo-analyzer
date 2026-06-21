@@ -72,14 +72,15 @@ function play(map: MajorMapReplay) {
       </span>
     </div>
 
-    <!-- Team rows -->
-    <div class="flex flex-col gap-1">
-      <div
-        v-for="(slot, i) in [slotA, slotB]"
-        :key="i"
-        class="flex items-center gap-2 rounded-md px-1.5 py-1.5"
-        :class="slot.isWinner ? 'bg-surge-500/10' : ''"
-      >
+    <!-- Team rows + watch: the square watch button sits beside the score -->
+    <div ref="menu" class="relative flex items-stretch gap-2">
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <div
+          v-for="(slot, i) in [slotA, slotB]"
+          :key="i"
+          class="flex items-center gap-2 rounded-md px-1.5 py-1.5"
+          :class="slot.isWinner ? 'bg-surge-500/10' : ''"
+        >
         <template v-if="slot.team">
           <img
             :src="slot.team.logo"
@@ -111,32 +112,32 @@ function play(map: MajorMapReplay) {
           :class="slot.isWinner ? 'font-bold text-surge-400' : 'text-ink-400'"
           >{{ slot.score ?? '–' }}</span
         >
+        </div>
       </div>
-    </div>
 
-    <!-- Maps / watch -->
-    <div ref="menu" class="relative mt-2 border-t border-ink-800/70 pt-2">
+      <!-- Watch: square (1:1) button sitting beside the score -->
       <button
         type="button"
         :disabled="!hasMaps"
         :aria-expanded="open"
-        class="flex w-full items-center justify-center gap-1.5 rounded-md border border-ink-700 bg-ink-900/60 px-2 py-1 text-xs font-medium text-ink-200 transition-colors enabled:hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60"
+        :aria-label="hasMaps ? t('major.watch') : t('major.notPlayed')"
+        :title="hasMaps ? t('major.watch') : t('major.notPlayed')"
+        class="flex w-20 shrink-0 items-center justify-center rounded-md border border-ink-700 bg-ink-900/60 text-ink-200 transition-colors enabled:hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60"
         @click="open = !open"
       >
-        <UiIcon :name="hasMaps ? 'play' : 'clock'" class="h-3.5 w-3.5 text-ink-400" />
-        {{ hasMaps ? t('major.watch') : t('major.notPlayed') }}
-        <UiIcon v-if="hasMaps" name="chevron-down" class="h-3 w-3 text-ink-500" />
+        <UiIcon :name="hasMaps ? 'play' : 'clock'" class="h-6 w-6 text-ink-400" />
       </button>
 
-      <!-- Map picker popover: square radar cards -->
+      <!-- Map picker popover: square radar cards, anchored to the watch button -->
       <div
         v-if="open && hasMaps"
-        class="absolute inset-x-0 top-full z-20 mt-1.5 rounded-lg border border-ink-700 bg-ink-900/95 p-2 shadow-2xl backdrop-blur"
+        class="absolute right-0 top-full z-20 mt-1.5 rounded-lg border border-ink-700 bg-ink-900/95 p-2 shadow-2xl backdrop-blur"
+        :class="match.maps.length >= 3 ? 'w-[22rem]' : 'w-60'"
       >
         <p class="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
           {{ t('major.pickMap') }}
         </p>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid gap-2" :class="match.maps.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'">
           <button
             v-for="m in match.maps"
             :key="m.map"
@@ -152,9 +153,12 @@ function play(map: MajorMapReplay) {
               :class="m.replay ? '' : 'opacity-30 grayscale'"
               loading="lazy"
             />
-            <!-- Map name and per-map score on a bottom gradient -->
-            <div class="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 bg-gradient-to-t from-ink-950/95 to-transparent px-2 pb-1.5 pt-6">
+            <!-- Map name on a top gradient -->
+            <div class="absolute inset-x-0 top-0 bg-gradient-to-b from-ink-950/95 to-transparent px-2 pb-6 pt-1.5">
               <span class="font-mono text-xs font-medium text-ink-50">{{ prettyMap(m.map) }}</span>
+            </div>
+            <!-- Per-map score on a bottom gradient -->
+            <div class="absolute inset-x-0 bottom-0 flex items-end justify-end gap-1 bg-gradient-to-t from-ink-950/95 to-transparent px-2 pb-1.5 pt-6">
               <span
                 v-if="m.scoreA != null && m.scoreB != null"
                 class="flex items-center gap-1 font-mono text-xs tabular-nums"
