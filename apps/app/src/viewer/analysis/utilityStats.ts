@@ -91,18 +91,30 @@ export function flashSetupForKill(
 }
 
 /**
- * Splits the match players into the two teams by their starting side, naming each
- * from the first round's clan names. Players are listed in the replay's order.
+ * Splits the match players into the two teams, naming each from the reference
+ * round's clan names. Players are listed in the replay's order.
+ *
+ * Names and sides must come from the *same* reference round, the first live
+ * (non-knife) one. When the match opens with a knife round, the side pick happens
+ * during the pistol round's freeze, so the clan names (captured at that freeze)
+ * are post-swap, while `player.startSide` (the parser's first-seen frame) still
+ * carries the knife-round side. Grouping by `startSide` would then put each
+ * player under the opposite team's name. Reading sides from the reference round's
+ * live frames (via `roundSides`) keeps both in sync; `startSide` is only a
+ * fallback for a player absent from that round's frames.
  */
 export function groupTeams(replay: Replay): Team[] {
-  const first = replay.rounds[0]
-  const ctName = first?.ctName || ''
-  const tName = first?.tName || ''
-  const ct = replay.players.filter((p) => p.startSide === 'CT').map((p) => ({ steamId: p.steamId, name: p.name }))
-  const t = replay.players.filter((p) => p.startSide === 'T').map((p) => ({ steamId: p.steamId, name: p.name }))
+  const ref = replay.rounds.find((r) => !isKnifeRound(r)) ?? replay.rounds[0]
+  const ctName = ref?.ctName || ''
+  const tName = ref?.tName || ''
+  const sides = ref ? roundSides(ref) : new Map<string, Side>()
+  const onSide = (side: Side) =>
+    replay.players
+      .filter((p) => (sides.get(p.steamId) ?? p.startSide) === side)
+      .map((p) => ({ steamId: p.steamId, name: p.name }))
   return [
-    { id: 0, name: ctName, players: ct },
-    { id: 1, name: tName, players: t },
+    { id: 0, name: ctName, players: onSide('CT') },
+    { id: 1, name: tName, players: onSide('T') },
   ]
 }
 
