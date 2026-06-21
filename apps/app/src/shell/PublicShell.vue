@@ -16,11 +16,16 @@ import {
 import { appFullscreenKey } from '@/shell/appFullscreen'
 import { useSidebar } from '@/shell/useSidebar'
 import { useI18n, type LocaleCode } from '@/i18n'
+import { useSeoHead } from '@/seo'
 
 // App chrome: a compact collapsible sidebar for the primary nav (Upload / Major /
 // Library) plus a thin top bar with a desktop-app-style Menubar (Info, Language).
 // The whole frame hides in fullscreen so the player can fill the screen.
 const { t, locale, setLocale, LOCALES } = useI18n()
+
+// Keep the document head (title, description, social tags, canonical) in sync
+// with the active route and locale.
+useSeoHead()
 
 const GITHUB_URL = 'https://github.com/zenojunior/cs-demo-analyzer'
 

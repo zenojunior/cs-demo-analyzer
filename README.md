@@ -8,34 +8,41 @@ no upload, not a single byte leaving your machine.
 
 ## Why
 
-I had been analyzing demos with other tools for years, and the experience always
-got in the way. Most of them ask you to install a database, spin up a Docker
-container and wire up a pile of configuration before you can watch a single
-round, and even then the visual side felt like an afterthought.
+Existing tools have too much friction: install a database, spin up Docker, wire up
+config, all before you can watch a single round, and the visual side still feels
+like an afterthought.
 
-I kept getting better at UI/UX and front-end work, so I decided to build the
-tool I always wished existed: something that opens instantly, looks good, and
-runs entirely on your machine. Making it open source means it can keep growing
-with the community instead of just scratching my own itch.
+I just needed a simple way to analyze the comms of PUG matches with my friends, so
+I built the tool I always wished existed: instant to open, good-looking, and fully
+client-side. It is open source so it can grow with the CS2 community, a game I have
+played since I was a kid, and a first step toward building in esports.
 
 ## Features
 
 - **2D replay** with round-by-round playback of player movement, duels and timing,
-  and auto-advance between rounds.
-- **Heatmaps** for deaths, presence and utility, filterable by side, player and round.
+  a live scoreboard, killfeed and in-game chat, and auto-advance between rounds.
+- **Heatmaps** for deaths, presence and utility, filterable by side, player and
+  round, with multi-floor support for maps like Nuke and Vertigo.
 - **Grenade trajectories** for smokes, molotovs, HEs, flashes and decoys, with the
   option to jump straight into the replay from a throw, plus in-replay visual
   effects for grenades and the bomb explosion.
+- **Utility analysis**: flash effectiveness (who blinded whom and for how long)
+  and HE / molotov damage dealt, broken down per player.
 - **Economy** breakdown per round: buy types, equipment value and money flow.
+- **Drawing tools**: a telestrator to draw on the map and break down positions
+  and executes.
 - **Replay comments**: annotate specific moments and revisit them later.
 - **Export / import**: save an analyzed match as a compact `.cs2dv` file and
   reopen it instantly, without re-parsing the original demo.
 - **Player comms**: in-game voice replayed alongside the action.
+- **Major showcase**: rewatch Counter-Strike Major playoff matches in 2D, map by
+  map, with the replays bundled in the project.
 - **100% client-side**: the demo is read and parsed in a Web Worker; nothing is
   ever sent to a server.
 - **Local history** of recently analyzed demos, kept in your browser (reopening
   one does not re-upload it).
-- **Multi-language UI**: English, Portuguese and Spanish.
+- **Multi-language UI**: 9 languages so far: English, Portuguese, Spanish, French,
+  German, Russian, Polish, Turkish and Ukrainian.
 
 Supported uploads: `.dem`, `.gz`, `.zip` and `.zst` (CS2 / Source 2).
 
@@ -60,7 +67,7 @@ pnpm install
 pnpm dev
 ```
 
-The app runs at the URL printed by Vite (default `http://localhost:5173`).
+The app runs at the URL printed by Vite (default `http://localhost:5174`).
 
 ### Other scripts
 
