@@ -156,9 +156,9 @@ export const MATCHES: MajorMatch[] = [
     scoreA: 1,
     scoreB: 2,
     maps: [
-      { map: 'de_anubis', replay: `${REPLAY_DIR}/sf2-anubis.cs2dv` },
-      { map: 'de_mirage', replay: `${REPLAY_DIR}/sf2-mirage.cs2dv` },
-      { map: 'de_dust2', replay: `${REPLAY_DIR}/sf2-dust2.cs2dv` },
+      { map: 'de_anubis', replay: `${REPLAY_DIR}/sf2-anubis.cs2dv`, scoreA: 14, scoreB: 16 },
+      { map: 'de_mirage', replay: `${REPLAY_DIR}/sf2-mirage.cs2dv`, scoreA: 13, scoreB: 8 },
+      { map: 'de_dust2', replay: `${REPLAY_DIR}/sf2-dust2.cs2dv`, scoreA: 12, scoreB: 16 },
     ],
   },
   {
