@@ -11,7 +11,9 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   modules: ['@wxt-dev/module-vue'],
   manifest: {
-    name: 'CS Demo Analyzer',
+    // "Faceit" stays in the name (descriptive, not implying affiliation) so the
+    // listing surfaces in store searches for Faceit tools.
+    name: 'CS Demo Analyzer - Faceit demos in 2D',
     description: 'Open any Faceit CS2 match as a 2D replay in one click. Demos are downloaded and parsed locally, 100% offline.',
     permissions: ['storage', 'offscreen'],
     // Required hosts: the shipping/next sources. Avoids <all_urls> and its review.
