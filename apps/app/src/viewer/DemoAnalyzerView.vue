@@ -93,13 +93,55 @@ const TAB_QUERY: Record<Tab, string | undefined> = {
 function goTab(tab: Tab) {
   // External replay: keep ?replay=/?name= and switch the tab via ?tab=.
   if (currentSrc.value) {
-    const query = { ...route.query, tab: TAB_QUERY[tab] }
+    // Drop the per-tab sub-page params (?h=, ?u=) when switching tabs.
+    const { h: _h, u: _u, ...rest } = route.query
+    const query = { ...rest, tab: TAB_QUERY[tab] }
     if (!query.tab) delete query.tab
     router.push({ path: '/', query })
     return
   }
   const id = currentId.value
   if (id) router.push(`/${id}${TAB_SEGMENT[tab]}`)
+}
+
+// The heatmap's own pages (presence/kills/deaths), each a separate URL: history
+// demos carry it as a path segment (/:id/heatmaps/kills), external replays as
+// `?h=` (presence is the default, so it has no segment/param).
+type HeatmapSource = 'presence' | 'kills' | 'deaths'
+const heatmapSource = computed<HeatmapSource>(() => {
+  const raw = route.params.sub || route.query.h
+  const s = Array.isArray(raw) ? raw[0] : raw
+  return s === 'kills' || s === 'deaths' ? s : 'presence'
+})
+function goHeatmapSource(src: HeatmapSource) {
+  if (currentSrc.value) {
+    const query = { ...route.query, tab: 'heatmaps', h: src === 'presence' ? undefined : src }
+    if (!query.h) delete query.h
+    router.push({ path: '/', query })
+    return
+  }
+  const id = currentId.value
+  if (id) router.push(`/${id}/heatmaps${src === 'presence' ? '' : `/${src}`}`)
+}
+
+// The utilities tab's own pages (throws/flashes/damage/heatmap), each a separate
+// URL: history demos carry it as a path segment (/:id/utilities/flashes),
+// external replays as `?u=` (throws is the default, so it has no segment/param).
+type UtilitySub = 'throws' | 'flashes' | 'damage' | 'heatmap'
+const utilitySub = computed<UtilitySub>(() => {
+  const raw = route.params.sub || route.query.u
+  const s = Array.isArray(raw) ? raw[0] : raw
+  return s === 'flashes' || s === 'damage' || s === 'heatmap' ? s : 'throws'
+})
+function goUtilitySub(sub: UtilitySub) {
+  if (currentSrc.value) {
+    const query = { ...route.query, tab: 'utilities', u: sub === 'throws' ? undefined : sub }
+    if (!query.u) delete query.u
+    router.push({ path: '/', query })
+    return
+  }
+  const id = currentId.value
+  if (id) router.push(`/${id}/utilities${sub === 'throws' ? '' : `/${sub}`}`)
 }
 
 // Landing-page ambient preview: rotates through a few maps, switching to the
@@ -356,12 +398,16 @@ function onImportInput(e: Event) {
       <HeatmapView
         v-if="activeTab === 'heatmap'"
         :replay="parser.replay.value"
+        :source="heatmapSource"
+        @update:source="goHeatmapSource"
         @jump="onGrenadeJump"
       />
       <UtilitiesView
         v-if="activeTab === 'utilities'"
         :replay="parser.replay.value"
         :players-by-id="playersById"
+        :sub="utilitySub"
+        @update:sub="goUtilitySub"
         @jump="onGrenadeJump"
       />
       <EconomyView v-if="activeTab === 'economy'" :replay="parser.replay.value" />

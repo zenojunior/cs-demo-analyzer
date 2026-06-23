@@ -20,9 +20,17 @@ const { t } = useI18n()
  * Nuke) it renders one plot per level side by side, each with the floor radar
  * and only the points whose height (Z axis) falls in that range.
  */
-const props = defineProps<{ replay: Replay }>()
+type Source = 'kills' | 'deaths' | 'presence'
+
+const props = defineProps<{
+  replay: Replay
+  /** Active heatmap page (presence/kills/deaths), driven by the URL. */
+  source: Source
+}>()
 
 const emit = defineEmits<{
+  /** Switch heatmap page (the parent maps it to a URL). */
+  (e: 'update:source', value: Source): void
   /** Seek the replay to a kill (clicked on a kill/death marker). */
   (e: 'jump', payload: { roundIndex: number; t: number }): void
 }>()
@@ -33,8 +41,6 @@ const calibration = computed(
 const levels = computed(() => calibration.value.levels ?? null)
 
 // --- Filters ---
-type Source = 'kills' | 'deaths' | 'presence'
-const source = ref<Source>('presence')
 const sideFilter = ref<Side | 'all'>('all')
 // Team is identified by the side it started on (rosters are fixed for the match;
 // only the side swaps at halftime), so 'CT'/'T' here mean the started-CT / -T team.
@@ -90,7 +96,7 @@ const SOURCE_META: Record<Source, { labelKey: string; identity: boolean }> = {
 }
 // Identity (side/player) only exists when the point carries who it is. Grenade
 // detonations do not carry the thrower, so the filter is ignored for them.
-const hasIdentity = computed(() => SOURCE_META[source.value].identity)
+const hasIdentity = computed(() => SOURCE_META[props.source].identity)
 
 /** A player's side in that round, from the live frames (so the pistol round's
  *  post-knife side swap doesn't invert CT/T; see `roundSides`). Cached per round. */
@@ -169,7 +175,7 @@ const rawPoints = computed<Pt[]>(() => {
     // The knife round has no meaningful positions to map, so skip it entirely.
     if (isKnifeRound(round)) return
     const fz = freezeSeconds(round)
-    if (source.value === 'deaths') {
+    if (props.source === 'deaths') {
       for (const ev of round.events) {
         if (ev.type !== 'kill') continue
         out.push({
@@ -182,7 +188,7 @@ const rawPoints = computed<Pt[]>(() => {
           kill: killInfo(round, idx, ev),
         })
       }
-    } else if (source.value === 'kills') {
+    } else if (props.source === 'kills') {
       // The kill event carries the victim's position, so the killer's spot is
       // read from the frames at the kill tick.
       for (const ev of round.events) {
@@ -237,9 +243,9 @@ interface Plot {
 
 // Discrete events (kills/deaths) read better as individual colored dots than as
 // a density blob; presence stays a heatmap.
-const plotMode = computed<'heat' | 'dots'>(() => (source.value === 'presence' ? 'heat' : 'dots'))
+const plotMode = computed<'heat' | 'dots'>(() => (props.source === 'presence' ? 'heat' : 'dots'))
 // Deaths read clearest as skulls; kills stay simple dots.
-const plotMarker = computed<'dot' | 'skull'>(() => (source.value === 'deaths' ? 'skull' : 'dot'))
+const plotMarker = computed<'dot' | 'skull'>(() => (props.source === 'deaths' ? 'skull' : 'dot'))
 
 /** One plot per floor (multi-level maps) or a single plot. */
 const plots = computed<Plot[]>(() => {
@@ -285,7 +291,7 @@ const rangeColor = computed(() => {
         type="button"
         class="cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors"
         :class="source === key ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
-        @click="source = key as Source"
+        @click="emit('update:source', key as Source)"
       >
         {{ t(meta.labelKey) }}
       </button>
