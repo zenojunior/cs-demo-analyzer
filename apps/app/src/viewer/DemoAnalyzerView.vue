@@ -6,6 +6,7 @@ import ViewerStage from '@/viewer/player/ViewerStage.vue'
 import HeatmapView from '@/viewer/analysis/HeatmapView.vue'
 import UtilitiesView from '@/viewer/analysis/UtilitiesView.vue'
 import EconomyView from '@/viewer/analysis/EconomyView.vue'
+import DuelsView from '@/viewer/analysis/DuelsView.vue'
 import DemoPreviewLoop from '@/viewer/player/DemoPreviewLoop.vue'
 import { useDemoParser } from '@/viewer/ingest/useDemoParser'
 import { useRecentDemos } from '@/viewer/ingest/useRecentDemos'
@@ -63,9 +64,10 @@ const currentSrc = ref<string | null>(null)
 const skipFreeze = computed(() => route.query.skipFreeze === '1' || route.query.skipFreeze === 'true')
 // `?autoplay=1` starts playback as soon as the replay loads (Major clips set it).
 const autoplay = computed(() => route.query.autoplay === '1' || route.query.autoplay === 'true')
-type Tab = 'viewer' | 'heatmap' | 'utilities' | 'economy'
+type Tab = 'viewer' | 'heatmap' | 'utilities' | 'economy' | 'duels'
 // The active tab is driven by the URL: `/:id` is the 2D stage, `/:id/heatmaps`
-// the heatmap, `/:id/utilities` the utilities page, `/:id/economy` the economy page.
+// the heatmap, `/:id/utilities` the utilities page, `/:id/economy` the economy
+// page, `/:id/duels` the duels page.
 const activeTab = computed<Tab>(() => {
   // History demos carry the tab as a path segment (/:id/:tab); external replays
   // (?replay=) have no id, so the tab rides along as ?tab=.
@@ -75,6 +77,7 @@ const activeTab = computed<Tab>(() => {
   // `grenades` kept as a backward-compatible alias for older links.
   if (tab === 'utilities' || tab === 'grenades') return 'utilities'
   if (tab === 'economy') return 'economy'
+  if (tab === 'duels') return 'duels'
   return 'viewer'
 })
 const TAB_SEGMENT: Record<Tab, string> = {
@@ -82,6 +85,7 @@ const TAB_SEGMENT: Record<Tab, string> = {
   heatmap: '/heatmaps',
   utilities: '/utilities',
   economy: '/economy',
+  duels: '/duels',
 }
 // Tab name used in the ?tab= query for external replays ('viewer' = no param).
 const TAB_QUERY: Record<Tab, string | undefined> = {
@@ -89,12 +93,13 @@ const TAB_QUERY: Record<Tab, string | undefined> = {
   heatmap: 'heatmaps',
   utilities: 'utilities',
   economy: 'economy',
+  duels: 'duels',
 }
 function goTab(tab: Tab) {
   // External replay: keep ?replay=/?name= and switch the tab via ?tab=.
   if (currentSrc.value) {
-    // Drop the per-tab sub-page params (?h=, ?u=) when switching tabs.
-    const { h: _h, u: _u, ...rest } = route.query
+    // Drop the per-tab sub-page params (?h=, ?u=, ?d=) when switching tabs.
+    const { h: _h, u: _u, d: _d, ...rest } = route.query
     const query = { ...rest, tab: TAB_QUERY[tab] }
     if (!query.tab) delete query.tab
     router.push({ path: '/', query })
@@ -142,6 +147,26 @@ function goUtilitySub(sub: UtilitySub) {
   }
   const id = currentId.value
   if (id) router.push(`/${id}/utilities${sub === 'throws' ? '' : `/${sub}`}`)
+}
+
+// The duels tab's own pages (matrix/opening/opening-map), each a separate URL:
+// history demos carry it as a path segment (/:id/duels/opening), external replays
+// as `?d=` (matrix is the default, so it has no segment/param).
+type DuelSub = 'matrix' | 'opening' | 'opening-map'
+const duelSub = computed<DuelSub>(() => {
+  const raw = route.params.sub || route.query.d
+  const s = Array.isArray(raw) ? raw[0] : raw
+  return s === 'opening' || s === 'opening-map' ? s : 'matrix'
+})
+function goDuelSub(sub: DuelSub) {
+  if (currentSrc.value) {
+    const query = { ...route.query, tab: 'duels', d: sub === 'matrix' ? undefined : sub }
+    if (!query.d) delete query.d
+    router.push({ path: '/', query })
+    return
+  }
+  const id = currentId.value
+  if (id) router.push(`/${id}/duels${sub === 'matrix' ? '' : `/${sub}`}`)
 }
 
 // Landing-page ambient preview: rotates through a few maps, switching to the
@@ -411,8 +436,15 @@ function onImportInput(e: Event) {
         @jump="onGrenadeJump"
       />
       <EconomyView v-if="activeTab === 'economy'" :replay="parser.replay.value" />
+      <DuelsView
+        v-if="activeTab === 'duels'"
+        :replay="parser.replay.value"
+        :sub="duelSub"
+        @update:sub="goDuelSub"
+        @jump="onGrenadeJump"
+      />
 
-      <!-- Tabs (2D / Heatmaps / Utilities / Economy) in the center of the appbar -->
+      <!-- Tabs (2D / Heatmaps / Utilities / Economy / Duels) in the center of the appbar -->
       <Teleport to="#publicbar-center">
         <div class="flex items-center gap-0.5 rounded-lg border border-ink-700 bg-ink-900/60 p-0.5">
           <button
@@ -446,6 +478,14 @@ function onImportInput(e: Event) {
             @click="goTab('economy')"
           >
             {{ t('tabs.economy') }}
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors"
+            :class="activeTab === 'duels' ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
+            @click="goTab('duels')"
+          >
+            {{ t('tabs.duels') }}
           </button>
         </div>
       </Teleport>

@@ -90,7 +90,31 @@
     "heatmaps": "Heatmaps",
     "grenades": "Grenades",
     "utilities": "Utilitaires",
-    "economy": "Économie"
+    "economy": "Économie",
+    "duels": "Duels"
+  },
+  "duels": {
+    "tabs": {
+      "matrix": "Matrice des duels",
+      "opening": "Statistiques du premier duel",
+      "opening-map": "Carte du premier duel"
+    },
+    "matrix": {
+      "cell": "{killer} a tué {victim} {count} fois"
+    },
+    "opening": {
+      "faction": "Faction",
+      "duelsWon": "Premiers duels gagnés",
+      "duelsLost": "Premiers duels perdus",
+      "conversion": "Gagné → round gagné",
+      "conversionHint": "Part des premiers duels gagnés où le camp a remporté le round",
+      "watchWon": "Voir les premiers duels gagnés",
+      "watchLost": "Voir les premiers duels perdus",
+      "lostConversion": "Perdu → round perdu",
+      "lostConversionHint": "Part des premiers duels perdus où le camp a aussi perdu le round",
+      "ignoreTraded": "Exclure les trades",
+      "ignoreTradedHint": "Ignorer les premiers duels où le vainqueur a été tradé en moins de 5s"
+    }
   },
   "analyzer": {
     "title": "Analyser une démo",

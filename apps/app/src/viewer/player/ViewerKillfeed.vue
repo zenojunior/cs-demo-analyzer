@@ -2,11 +2,8 @@
 import { computed } from 'vue'
 import type { GameEvent, PlayerMeta, Round, Side } from '@/viewer/domain/schema'
 import { SIDE_COLOR } from '@/viewer/domain/colors'
-import { killWeaponIcon } from '@/viewer/domain/weaponIcons'
 import { flashSetupForKill, roundSides } from '@/viewer/analysis/utilityStats'
-import { useI18n } from '@/i18n'
-
-const { t } = useI18n()
+import KillfeedRow from '@/viewer/player/KillfeedRow.vue'
 
 type Kill = Extract<GameEvent, { type: 'kill' }>
 
@@ -57,49 +54,19 @@ const colorOf = (id: string | null) =>
     <div
       v-for="({ k, assisterSteamId, assistedFlash }, i) in kills"
       :key="k.tick + '-' + i"
-      class="flex items-center gap-1.5 rounded-md bg-ink-950/75 px-2 py-1 text-xs backdrop-blur"
+      class="rounded-md bg-ink-950/75 px-2 py-1 backdrop-blur"
     >
-      <!-- Killer first, then assister (CS2 killfeed order): killer + assister.
-           The `+` takes the team color — killer and assister are always
-           teammates. A flash assist adds the flash icon right after the `+`. -->
-      <span
-        v-if="k.attackerSteamId"
-        class="font-medium"
-        :style="{ color: colorOf(k.attackerSteamId) }"
-      >
-        {{ nameOf(k.attackerSteamId) }}
-      </span>
-
-      <template v-if="assisterSteamId">
-        <span class="font-medium" :style="{ color: colorOf(k.attackerSteamId) }">+</span>
-        <img
-          v-if="assistedFlash"
-          v-tooltip="t('viewer.flashAssist')"
-          src="/weapons/flash.svg"
-          alt="flash assist"
-          class="h-3 w-3 opacity-90"
-        />
-        <span class="font-medium" :style="{ color: colorOf(assisterSteamId) }">
-          {{ nameOf(assisterSteamId) }}
-        </span>
-      </template>
-      <img
-        v-if="killWeaponIcon(k.weapon)"
-        :src="killWeaponIcon(k.weapon)!"
-        :alt="k.weapon"
-        class="h-3 w-6 object-contain opacity-90"
+      <KillfeedRow
+        :attacker-name="k.attackerSteamId ? nameOf(k.attackerSteamId) : null"
+        :attacker-color="colorOf(k.attackerSteamId)"
+        :assister-name="assisterSteamId ? nameOf(assisterSteamId) : null"
+        :assister-color="colorOf(assisterSteamId)"
+        :assisted-flash="assistedFlash"
+        :weapon="k.weapon"
+        :headshot="k.headshot"
+        :victim-name="nameOf(k.victimSteamId)"
+        :victim-color="colorOf(k.victimSteamId)"
       />
-      <span v-else class="text-ink-400">{{ k.weapon }}</span>
-      <img
-        v-if="k.headshot"
-        v-tooltip="t('viewer.headshot')"
-        src="/weapons/headshot.svg"
-        alt="Headshot"
-        class="h-3.5 w-3.5"
-      />
-      <span class="font-medium" :style="{ color: colorOf(k.victimSteamId) }">
-        {{ nameOf(k.victimSteamId) }}
-      </span>
     </div>
   </div>
 </template>

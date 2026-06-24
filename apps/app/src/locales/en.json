@@ -90,7 +90,31 @@
     "heatmaps": "Heatmaps",
     "grenades": "Grenades",
     "utilities": "Utilities",
-    "economy": "Economy"
+    "economy": "Economy",
+    "duels": "Duels"
+  },
+  "duels": {
+    "tabs": {
+      "matrix": "Duel matrix",
+      "opening": "Opening duel stats",
+      "opening-map": "Opening duel map"
+    },
+    "matrix": {
+      "cell": "{killer} killed {victim} {count} times"
+    },
+    "opening": {
+      "faction": "Faction",
+      "duelsWon": "Opening duels won",
+      "duelsLost": "Opening duels lost",
+      "conversion": "Won → round won",
+      "conversionHint": "Share of won opening duels where the side went on to win the round",
+      "watchWon": "Watch won opening duels",
+      "watchLost": "Watch lost opening duels",
+      "lostConversion": "Lost → round lost",
+      "lostConversionHint": "Share of lost opening duels where the side also lost the round",
+      "ignoreTraded": "Exclude traded",
+      "ignoreTradedHint": "Ignore opening duels where the entry winner was traded back within 5s"
+    }
   },
   "analyzer": {
     "title": "Analyze demo",
