@@ -57,7 +57,7 @@ function itemClass(name: string) {
       :class="iconOnly ? 'justify-center' : ''"
     >
       <Cs2Mark size="sm" />
-      <span v-if="!iconOnly" class="truncate text-sm font-medium">CS Demo Analyzer</span>
+      <span v-if="!iconOnly" class="truncate text-sm font-medium">CS2d.app</span>
     </RouterLink>
 
     <TooltipProvider>

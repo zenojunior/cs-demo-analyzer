@@ -83,7 +83,8 @@
     "contactBody": "Fragen zum Datenschutz? Schreiben Sie mir an {email}."
   },
   "seo": {
-    "appDescription": "2D-Replay-Viewer für Counter-Strike-2-Demos, der vollständig in Ihrem Browser läuft: Ihre Demos verlassen nie Ihren Rechner."
+    "appDescription": "2D-Replay-Viewer für Counter-Strike-2-Demos, der vollständig in Ihrem Browser läuft: Ihre Demos verlassen nie Ihren Rechner.",
+    "homeTitle": "2D-Replay-Viewer für Counter-Strike-2-Demos"
   },
   "tabs": {
     "replay": "2D-Replay",

@@ -40,8 +40,8 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['icon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'CS Demo Analyzer',
-        short_name: 'CS Demo',
+        name: 'CS2d.app',
+        short_name: 'CS2d.app',
         description:
           'The fastest browser-based 2D replay viewer for CS2 demos. Runs 100% offline.',
         theme_color: '#0a0c12',

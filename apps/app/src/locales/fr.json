@@ -83,7 +83,8 @@
     "contactBody": "Des questions sur la confidentialité ? Contactez-moi à {email}."
   },
   "seo": {
-    "appDescription": "Visionneuse de replay 2D pour les démos de Counter-Strike 2 qui fonctionne entièrement dans votre navigateur : vos démos ne quittent jamais votre machine."
+    "appDescription": "Visionneuse de replay 2D pour les démos de Counter-Strike 2 qui fonctionne entièrement dans votre navigateur : vos démos ne quittent jamais votre machine.",
+    "homeTitle": "Visionneuse de replay 2D pour les démos de Counter-Strike 2"
   },
   "tabs": {
     "replay": "Replay 2D",
