@@ -90,7 +90,31 @@
     "heatmaps": "Heatmap'ler",
     "grenades": "Granatlar",
     "utilities": "Utility",
-    "economy": "Ekonomi"
+    "economy": "Ekonomi",
+    "duels": "Düellolar"
+  },
+  "duels": {
+    "tabs": {
+      "matrix": "Düello matrisi",
+      "opening": "İlk düello istatistikleri",
+      "opening-map": "İlk düello haritası"
+    },
+    "matrix": {
+      "cell": "{killer}, {victim} oyuncusunu {count} kez öldürdü"
+    },
+    "opening": {
+      "faction": "Taraf",
+      "duelsWon": "Kazanılan ilk düellolar",
+      "duelsLost": "Kaybedilen ilk düellolar",
+      "conversion": "Kazanım → raunt kazanıldı",
+      "conversionHint": "Kazanılan ilk düellolardan tarafın raundu da kazandığı oran",
+      "watchWon": "Kazanılan ilk düelloları izle",
+      "watchLost": "Kaybedilen ilk düelloları izle",
+      "lostConversion": "Kayıp → raunt kaybı",
+      "lostConversionHint": "Kaybedilen ilk düellolardan tarafın raundu da kaybettiği oran",
+      "ignoreTraded": "Takasları hariç tut",
+      "ignoreTradedHint": "İlk düelloyu kazananın 5 sn içinde takaslandığı düelloları yok say"
+    }
   },
   "analyzer": {
     "title": "Demo'yu analiz et",
@@ -258,8 +282,7 @@
     "tabs": {
       "throws": "Atışlar",
       "flashes": "Flaşlar",
-      "damage": "Hasar",
-      "heatmap": "Heatmap"
+      "damage": "Hasar"
     },
     "empty": "Bu demo için ekipman verisi yok.",
     "flash": {
@@ -299,6 +322,7 @@
     "kills": "Öldürmeler",
     "deaths": "Ölümler",
     "presence": "Varlık",
+    "grenades": "Granatlar",
     "level": "Kat",
     "side": "Taraf",
     "both": "İkisi de",

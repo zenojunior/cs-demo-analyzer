@@ -27,6 +27,15 @@ const props = defineProps<{
   mode?: 'heat' | 'dots'
   /** Marker shape in dots mode: a filled circle or a skull (e.g. for deaths). */
   marker?: 'dot' | 'skull'
+  /** Draw a faint shooter -> victim line for every point that carries a kill
+   *  (dots mode), so all engagements show their path, not just dots. */
+  paths?: boolean
+  /** Emphasize one engagement's path (by round + instant), e.g. the row hovered
+   *  in a side list. Draws the bright line + shooter marker for that kill. */
+  highlight?: { roundIndex: number; t: number } | null
+  /** Scale of the dot / skull markers (1 = default). The opening-duel map and the
+   *  kills/deaths heatmaps use a smaller one for a tighter, less cluttered look. */
+  markerScale?: number
 }>()
 
 const emit = defineEmits<{ jump: [payload: { roundIndex: number; t: number }] }>()
@@ -154,8 +163,6 @@ function render() {
   const w = L * zoom.value
   if (radarReady) {
     ctx.drawImage(radarImg, panX, panY, w, w)
-    ctx.fillStyle = 'rgba(8, 11, 18, 0.45)'
-    ctx.fillRect(panX, panY, w, w)
   } else {
     ctx.fillStyle = '#0b0e14'
     ctx.fillRect(0, 0, cw, ch)
@@ -167,12 +174,102 @@ function render() {
     selected.value.sy = panY + f.fy * w
   }
   if (props.mode === 'dots') {
+    if (props.paths) drawAllPaths(w)
     drawDots(w)
+    drawHighlightPath(w)
     drawSelection(w)
   } else if (heatHasData) {
     ctx.imageSmoothingEnabled = true
     ctx.drawImage(heatCanvas, panX, panY, w, w)
   }
+}
+
+/** For every kill point: a faint shooter -> victim line and a circle marking the
+ *  shooter (the player who got the kill). The victim skull is already drawn by
+ *  `drawDots`; this adds the line and the shooter dot. */
+function drawAllPaths(w: number) {
+  if (!ctx) return
+  const r = Math.max(3, L * 0.006)
+  ctx.save()
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.55)'
+  ctx.shadowBlur = 1.5
+  for (const p of props.points) {
+    const k = p.kill
+    if (!k || k.ax == null || k.ay == null) continue
+    const a = worldToFraction(props.calibration, k.ax, k.ay)
+    const v = worldToFraction(props.calibration, k.vx, k.vy)
+    const asx = panX + a.fx * w
+    const asy = panY + a.fy * w
+    // The shooter dot/line take the shooter's (attacker's) side color.
+    const color = k.attackerColor
+    // Faint line shooter -> victim.
+    ctx.setLineDash([4, 4])
+    ctx.lineWidth = 1
+    ctx.strokeStyle = color + '40'
+    ctx.beginPath()
+    ctx.moveTo(asx, asy)
+    ctx.lineTo(panX + v.fx * w, panY + v.fy * w)
+    ctx.stroke()
+    // Shooter (first-kill) circle.
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.arc(asx, asy, r, 0, Math.PI * 2)
+    ctx.fillStyle = color + 'cc'
+    ctx.fill()
+    ctx.lineWidth = 1
+    ctx.strokeStyle = color
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/** Bright shooter -> victim line and shooter marker for one engagement. */
+function emphasizeKill(k: KillInfo, w: number) {
+  if (!ctx || k.ax == null || k.ay == null) return
+  const a = worldToFraction(props.calibration, k.ax, k.ay)
+  const v = worldToFraction(props.calibration, k.vx, k.vy)
+  const asx = panX + a.fx * w
+  const asy = panY + a.fy * w
+  ctx.save()
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.65)'
+  ctx.shadowBlur = 2
+  ctx.setLineDash([5, 4])
+  ctx.lineWidth = 2
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+  ctx.beginPath()
+  ctx.moveTo(asx, asy)
+  ctx.lineTo(panX + v.fx * w, panY + v.fy * w)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.beginPath()
+  ctx.arc(asx, asy, Math.max(4, L * 0.009), 0, Math.PI * 2)
+  ctx.fillStyle = k.attackerColor
+  ctx.fill()
+  ctx.lineWidth = 2
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+  ctx.stroke()
+  // Death spot: skull tinted by the victim's side, matching the click selection
+  // so hovering and clicking light up the same path end.
+  const skullImg = skullImage(k.victimColor)
+  if (skullImg) {
+    const s = Math.max(3, L * 0.007) * (props.markerScale ?? 1) * 3.6
+    ctx.drawImage(skullImg, panX + v.fx * w - s / 2, panY + v.fy * w - s / 2, s, s)
+  }
+  ctx.restore()
+}
+
+/** Emphasize the highlighted engagement (a hovered list row, via `highlight`)
+ *  and whatever marker is under the cursor on the canvas, so hovering either the
+ *  shooter or the victim lights up the whole path. */
+function drawHighlightPath(w: number) {
+  const hoverKill = hovered.value?.kill
+  if (hoverKill) emphasizeKill(hoverKill, w)
+  const h = props.highlight
+  if (!h) return
+  const p = props.points.find(
+    (pt) => pt.kill && pt.kill.roundIndex === h.roundIndex && pt.kill.t === h.t,
+  )
+  if (p?.kill && p !== hovered.value) emphasizeKill(p.kill, w)
 }
 
 /** When a kill/death is selected, draw a line from the shooter's spot to the
@@ -187,7 +284,7 @@ function drawSelection(w: number) {
   const asy = panY + a.fy * w
   const vsx = panX + v.fx * w
   const vsy = panY + v.fy * w
-  const r = Math.max(3, L * 0.007)
+  const r = Math.max(3, L * 0.007) * (props.markerScale ?? 1)
   ctx.save()
   ctx.shadowColor = 'rgba(0, 0, 0, 0.65)'
   ctx.shadowBlur = 2
@@ -252,7 +349,7 @@ function skullImage(color: string): HTMLCanvasElement | null {
  *  on-screen radar size; positions come from map fractions. */
 function drawDots(w: number) {
   if (!ctx) return
-  const r = Math.max(3, L * 0.007)
+  const r = Math.max(3, L * 0.007) * (props.markerScale ?? 1)
   const skull = props.marker === 'skull'
   ctx.lineWidth = 1
   ctx.save()
@@ -263,7 +360,11 @@ function drawDots(w: number) {
     if (fx < 0 || fx >= 1 || fy < 0 || fy >= 1) continue
     const sx = panX + fx * w
     const sy = panY + fy * w
-    const color = p.side ? SIDE_COLOR[p.side] : '#cbd5e1'
+    // A skull marks the victim's death: tint by the victim's side (from the kill
+    // data) rather than the point's side, which on the opening-duel map is the
+    // winner's. Matches the selected/clicked skull below.
+    const color =
+      skull && p.kill ? p.kill.victimColor : p.side ? SIDE_COLOR[p.side] : '#cbd5e1'
     const hot = p === hovered.value
     // Hovered marker: a white halo ring behind it, and a slightly larger size.
     if (hot) {
@@ -333,22 +434,34 @@ const selected = ref<{ wx: number; wy: number; sx: number; sy: number; kill: Kil
 // Kill point currently under the cursor, drawn emphasized (hover effect).
 const hovered = ref<Point | null>(null)
 
-/** Nearest kill point to a canvas-space (mx, my), within the marker hit radius. */
-function hitTest(mx: number, my: number): { point: Point; sx: number; sy: number } | null {
+/** Nearest kill marker to a canvas-space (mx, my), within the marker hit radius.
+ *  Both the victim (death spot) and, when paths are drawn, the shooter circle are
+ *  hittable, so either end of an engagement is clickable. `wx`/`wy` is the world
+ *  position of the marker hit (anchors the popover where the user clicked). */
+function hitTest(
+  mx: number,
+  my: number,
+): { point: Point; sx: number; sy: number; wx: number; wy: number } | null {
   const w = L * zoom.value
   const reach = Math.max(11, L * 0.014)
-  let best: { point: Point; sx: number; sy: number } | null = null
+  let best: { point: Point; sx: number; sy: number; wx: number; wy: number } | null = null
   let bestDist = reach * reach
-  for (const p of props.points) {
-    if (!p.kill) continue
-    const { fx, fy } = worldToFraction(props.calibration, p.x, p.y)
-    if (fx < 0 || fx >= 1 || fy < 0 || fy >= 1) continue
+  const consider = (p: Point, wx: number, wy: number) => {
+    const { fx, fy } = worldToFraction(props.calibration, wx, wy)
+    if (fx < 0 || fx >= 1 || fy < 0 || fy >= 1) return
     const sx = panX + fx * w
     const sy = panY + fy * w
     const d = (sx - mx) ** 2 + (sy - my) ** 2
     if (d <= bestDist) {
       bestDist = d
-      best = { point: p, sx, sy }
+      best = { point: p, sx, sy, wx, wy }
+    }
+  }
+  for (const p of props.points) {
+    if (!p.kill) continue
+    consider(p, p.x, p.y) // victim / death spot
+    if (props.paths && p.kill.ax != null && p.kill.ay != null) {
+      consider(p, p.kill.ax, p.kill.ay) // shooter (first-kill) circle
     }
   }
   return best
@@ -402,7 +515,7 @@ function onPointerUp(e: PointerEvent) {
     const rect = canvas.value!.getBoundingClientRect()
     const hit = hitTest(e.clientX - rect.left, e.clientY - rect.top)
     selected.value = hit
-      ? { wx: hit.point.x, wy: hit.point.y, sx: hit.sx, sy: hit.sy, kill: hit.point.kill! }
+      ? { wx: hit.wx, wy: hit.wy, sx: hit.sx, sy: hit.sy, kill: hit.point.kill! }
       : null
     render()
   }
@@ -458,6 +571,8 @@ watch([() => props.points, () => props.mode, () => props.marker], () => {
   hovered.value = null
   buildHeat()
 })
+// Re-render (cheap, no heat rebuild) when the external highlight changes.
+watch(() => props.highlight, () => render())
 
 const canReset = computed(() => zoom.value > 1.0001)
 </script>

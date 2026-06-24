@@ -90,7 +90,31 @@
     "heatmaps": "Heatmaps",
     "grenades": "Granaten",
     "utilities": "Utilities",
-    "economy": "Economy"
+    "economy": "Economy",
+    "duels": "Duelle"
+  },
+  "duels": {
+    "tabs": {
+      "matrix": "Duell-Matrix",
+      "opening": "Eröffnungsduell-Statistik",
+      "opening-map": "Eröffnungsduell-Karte"
+    },
+    "matrix": {
+      "cell": "{killer} tötete {victim} {count}-mal"
+    },
+    "opening": {
+      "faction": "Fraktion",
+      "duelsWon": "Eröffnungsduelle gewonnen",
+      "duelsLost": "Eröffnungsduelle verloren",
+      "conversion": "Gewonnen → Runde gewonnen",
+      "conversionHint": "Anteil der gewonnenen Eröffnungsduelle, bei denen die Seite die Runde gewann",
+      "watchWon": "Gewonnene Eröffnungsduelle ansehen",
+      "watchLost": "Verlorene Eröffnungsduelle ansehen",
+      "lostConversion": "Verloren → Runde verloren",
+      "lostConversionHint": "Anteil der verlorenen Eröffnungsduelle, bei denen die Seite auch die Runde verlor",
+      "ignoreTraded": "Getauschte ausschließen",
+      "ignoreTradedHint": "Eröffnungsduelle ignorieren, bei denen der Sieger innerhalb von 5 s zurückgetauscht wurde"
+    }
   },
   "analyzer": {
     "title": "Demo analysieren",
@@ -258,8 +282,7 @@
     "tabs": {
       "throws": "Würfe",
       "flashes": "Flashes",
-      "damage": "Schaden",
-      "heatmap": "Heatmap"
+      "damage": "Schaden"
     },
     "empty": "Keine Utility-Daten für dieses Demo.",
     "flash": {
@@ -299,6 +322,7 @@
     "kills": "Kills",
     "deaths": "Tode",
     "presence": "Präsenz",
+    "grenades": "Granaten",
     "level": "Ebene",
     "side": "Seite",
     "both": "Beide",

@@ -4,6 +4,7 @@ import type { Replay, Round, Side } from '@/viewer/domain/schema'
 import { MAP_CALIBRATION } from '@/viewer/domain/calibration'
 import { SIDE_COLOR } from '@/viewer/domain/colors'
 import HeatmapPlot from '@/viewer/analysis/HeatmapPlot.vue'
+import UtilityHeatmapView from '@/viewer/analysis/UtilityHeatmapView.vue'
 import type { KillInfo } from '@/viewer/analysis/heatmapTypes'
 import { killWeaponIcon } from '@/viewer/domain/weaponIcons'
 import { isKnifeRound, roundSides } from '@/viewer/analysis/utilityStats'
@@ -20,11 +21,11 @@ const { t } = useI18n()
  * Nuke) it renders one plot per level side by side, each with the floor radar
  * and only the points whose height (Z axis) falls in that range.
  */
-type Source = 'kills' | 'deaths' | 'presence'
+type Source = 'kills' | 'deaths' | 'presence' | 'grenades'
 
 const props = defineProps<{
   replay: Replay
-  /** Active heatmap page (presence/kills/deaths), driven by the URL. */
+  /** Active heatmap page (presence/kills/deaths/grenades), driven by the URL. */
   source: Source
 }>()
 
@@ -108,6 +109,9 @@ const SOURCE_META: Record<Source, { labelKey: string; identity: boolean }> = {
   presence: { labelKey: 'heatmap.presence', identity: true },
   kills: { labelKey: 'heatmap.kills', identity: true },
   deaths: { labelKey: 'heatmap.deaths', identity: true },
+  // Grenade detonation density. It carries its own filters/plots
+  // (UtilityHeatmapView), so the shared sidebar below is skipped for it.
+  grenades: { labelKey: 'heatmap.grenades', identity: false },
 }
 // Identity (side/player) only exists when the point carries who it is. Grenade
 // detonations do not carry the thrower, so the filter is ignored for them.
@@ -314,7 +318,10 @@ const rangeColor = computed(() => {
       </button>
     </div>
 
-    <div class="flex min-h-0 flex-1">
+    <!-- Grenade detonation heatmap: brings its own filters and plots. -->
+    <UtilityHeatmapView v-if="source === 'grenades'" :replay="replay" class="min-h-0 flex-1" />
+
+    <div v-else class="flex min-h-0 flex-1">
     <!-- Filters panel -->
     <aside class="flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink-800 bg-ink-900/40 p-4">
       <!-- Side -->
@@ -364,6 +371,7 @@ const rangeColor = computed(() => {
           :label="plot.label"
           :mode="plotMode"
           :marker="plotMarker"
+          :marker-scale="0.6"
           @jump="(p) => emit('jump', p)"
         />
       </div>

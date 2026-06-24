@@ -90,7 +90,31 @@
     "heatmaps": "Heatmapy",
     "grenades": "Granaty",
     "utilities": "Utility",
-    "economy": "Ekonomia"
+    "economy": "Ekonomia",
+    "duels": "Pojedynki"
+  },
+  "duels": {
+    "tabs": {
+      "matrix": "Macierz pojedynków",
+      "opening": "Statystyki pierwszego pojedynku",
+      "opening-map": "Mapa pierwszego pojedynku"
+    },
+    "matrix": {
+      "cell": "{killer} zabił {victim} {count} razy"
+    },
+    "opening": {
+      "faction": "Frakcja",
+      "duelsWon": "Wygrane pierwsze pojedynki",
+      "duelsLost": "Przegrane pierwsze pojedynki",
+      "conversion": "Wygrane → runda wygrana",
+      "conversionHint": "Odsetek wygranych pierwszych pojedynków, w których strona wygrała rundę",
+      "watchWon": "Zobacz wygrane pierwsze pojedynki",
+      "watchLost": "Zobacz przegrane pierwsze pojedynki",
+      "lostConversion": "Przegrane → runda przegrana",
+      "lostConversionHint": "Odsetek przegranych pierwszych pojedynków, w których strona także przegrała rundę",
+      "ignoreTraded": "Pomiń wymienione",
+      "ignoreTradedHint": "Ignoruj pierwsze pojedynki, w których zwycięzca został odbity w ciągu 5s"
+    }
   },
   "analyzer": {
     "title": "Analizuj demo",
@@ -258,8 +282,7 @@
     "tabs": {
       "throws": "Rzuty",
       "flashes": "Flashe",
-      "damage": "Obrażenia",
-      "heatmap": "Heatmapa"
+      "damage": "Obrażenia"
     },
     "empty": "Brak danych o utility dla tego dema.",
     "flash": {
@@ -299,6 +322,7 @@
     "kills": "Zabójstwa",
     "deaths": "Śmierci",
     "presence": "Obecność",
+    "grenades": "Granaty",
     "level": "Poziom",
     "side": "Strona",
     "both": "Obie",

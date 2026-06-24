@@ -90,7 +90,31 @@
     "heatmaps": "Heatmaps",
     "grenades": "Granadas",
     "utilities": "Utilitárias",
-    "economy": "Economia"
+    "economy": "Economia",
+    "duels": "Duelos"
+  },
+  "duels": {
+    "tabs": {
+      "matrix": "Matriz de duelos",
+      "opening": "Estatísticas de primeiro duelo",
+      "opening-map": "Mapa de primeiro duelo"
+    },
+    "matrix": {
+      "cell": "{killer} matou {victim} {count} vezes"
+    },
+    "opening": {
+      "faction": "Facção",
+      "duelsWon": "Primeiros duelos vencidos",
+      "duelsLost": "Primeiros duelos perdidos",
+      "conversion": "Vencido → round vencido",
+      "conversionHint": "Fração dos primeiros duelos vencidos em que o lado venceu o round",
+      "watchWon": "Assistir aos primeiros duelos vencidos",
+      "watchLost": "Assistir aos primeiros duelos perdidos",
+      "lostConversion": "Perdido → round perdido",
+      "lostConversionHint": "Fração dos primeiros duelos perdidos em que o lado também perdeu o round",
+      "ignoreTraded": "Desconsiderar trades",
+      "ignoreTradedHint": "Ignora primeiros duelos em que o vencedor da entrada foi trocado em até 5s"
+    }
   },
   "analyzer": {
     "title": "Analisar demo",
@@ -258,8 +282,7 @@
     "tabs": {
       "throws": "Lançamentos",
       "flashes": "Flashes",
-      "damage": "Dano",
-      "heatmap": "Heatmap"
+      "damage": "Dano"
     },
     "empty": "Sem dados de utilitárias para esta demo.",
     "flash": {
@@ -299,6 +322,7 @@
     "kills": "Abates",
     "deaths": "Mortes",
     "presence": "Presença",
+    "grenades": "Granadas",
     "level": "Nível",
     "side": "Lado",
     "both": "Ambos",

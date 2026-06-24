@@ -2386,17 +2386,24 @@ watch(() => props.coachTool, draw)
 watch(() => props.playerOverrides, draw, { deep: true })
 watch(() => props.coachGrenades, draw, { deep: true })
 watch(() => props.coachGrenadeKind, draw)
-watch(radarSource, (src) => {
+// Point the radar at a new source. When the browser already has the image
+// cached, `onload` would still fire on a later tick, leaving one frame where
+// the grenade paths draw over an empty map. Mark it ready synchronously on a
+// cache hit so the radar lands in the same draw() as everything on top of it.
+function setRadarSource(src: string) {
   radarReady = false
   radar.src = src
-})
+  if (radar.complete && radar.naturalWidth > 0) radarReady = true
+}
+
+watch(radarSource, setRadarSource)
 
 onMounted(() => {
   radar.onload = () => {
     radarReady = true
     draw()
   }
-  radar.src = radarSource()
+  setRadarSource(radarSource())
   ro = new ResizeObserver(resize)
   if (wrap.value) ro.observe(wrap.value)
   resize()

@@ -90,7 +90,31 @@
     "heatmaps": "Heatmaps",
     "grenades": "Granadas",
     "utilities": "Utilidad",
-    "economy": "Economía"
+    "economy": "Economía",
+    "duels": "Duelos"
+  },
+  "duels": {
+    "tabs": {
+      "matrix": "Matriz de duelos",
+      "opening": "Estadísticas de primer duelo",
+      "opening-map": "Mapa de primer duelo"
+    },
+    "matrix": {
+      "cell": "{killer} mató a {victim} {count} veces"
+    },
+    "opening": {
+      "faction": "Facción",
+      "duelsWon": "Primeros duelos ganados",
+      "duelsLost": "Primeros duelos perdidos",
+      "conversion": "Ganado → ronda ganada",
+      "conversionHint": "Porcentaje de primeros duelos ganados en los que el bando ganó la ronda",
+      "watchWon": "Ver primeros duelos ganados",
+      "watchLost": "Ver primeros duelos perdidos",
+      "lostConversion": "Perdido → ronda perdida",
+      "lostConversionHint": "Porcentaje de primeros duelos perdidos en los que el bando también perdió la ronda",
+      "ignoreTraded": "Excluir intercambiados",
+      "ignoreTradedHint": "Ignorar primeros duelos donde el ganador fue intercambiado en 5s"
+    }
   },
   "analyzer": {
     "title": "Analizar demo",
@@ -258,8 +282,7 @@
     "tabs": {
       "throws": "Lanzamientos",
       "flashes": "Flashes",
-      "damage": "Daño",
-      "heatmap": "Heatmap"
+      "damage": "Daño"
     },
     "empty": "No hay datos de utilidad para esta demo.",
     "flash": {
@@ -299,6 +322,7 @@
     "kills": "Bajas",
     "deaths": "Muertes",
     "presence": "Presencia",
+    "grenades": "Granadas",
     "level": "Nivel",
     "side": "Lado",
     "both": "Ambos",
