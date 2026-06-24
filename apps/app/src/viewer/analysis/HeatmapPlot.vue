@@ -33,9 +33,9 @@ const props = defineProps<{
   /** Emphasize one engagement's path (by round + instant), e.g. the row hovered
    *  in a side list. Draws the bright line + shooter marker for that kill. */
   highlight?: { roundIndex: number; t: number } | null
-  /** Scale of the skull marker (1 = default). The opening-duel map uses a smaller
-   *  one so the skulls don't dwarf the shooter dots and paths. */
-  skullScale?: number
+  /** Scale of the dot / skull markers (1 = default). The opening-duel map and the
+   *  kills/deaths heatmaps use a smaller one for a tighter, less cluttered look. */
+  markerScale?: number
 }>()
 
 const emit = defineEmits<{ jump: [payload: { roundIndex: number; t: number }] }>()
@@ -279,7 +279,7 @@ function drawSelection(w: number) {
   const asy = panY + a.fy * w
   const vsx = panX + v.fx * w
   const vsy = panY + v.fy * w
-  const r = Math.max(3, L * 0.007)
+  const r = Math.max(3, L * 0.007) * (props.markerScale ?? 1)
   ctx.save()
   ctx.shadowColor = 'rgba(0, 0, 0, 0.65)'
   ctx.shadowBlur = 2
@@ -303,7 +303,7 @@ function drawSelection(w: number) {
   // Death spot: skull, tinted by the victim's side.
   const skullImg = skullImage(k.victimColor)
   if (skullImg) {
-    const s = r * 3.6 * (props.skullScale ?? 1)
+    const s = r * 3.6
     ctx.drawImage(skullImg, vsx - s / 2, vsy - s / 2, s, s)
   }
   ctx.restore()
@@ -344,7 +344,7 @@ function skullImage(color: string): HTMLCanvasElement | null {
  *  on-screen radar size; positions come from map fractions. */
 function drawDots(w: number) {
   if (!ctx) return
-  const r = Math.max(3, L * 0.007)
+  const r = Math.max(3, L * 0.007) * (props.markerScale ?? 1)
   const skull = props.marker === 'skull'
   ctx.lineWidth = 1
   ctx.save()
@@ -375,7 +375,7 @@ function drawDots(w: number) {
     if (skull) {
       const img = skullImage(color)
       if (!img) continue
-      const s = r * 3.6 * (props.skullScale ?? 1) * (hot ? 1.3 : 1)
+      const s = r * 3.6 * (hot ? 1.3 : 1)
       ctx.drawImage(img, sx - s / 2, sy - s / 2, s, s)
     } else {
       ctx.beginPath()

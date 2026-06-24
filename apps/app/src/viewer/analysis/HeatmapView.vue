@@ -364,6 +364,7 @@ const rangeColor = computed(() => {
           :label="plot.label"
           :mode="plotMode"
           :marker="plotMarker"
+          :marker-scale="0.6"
           @jump="(p) => emit('jump', p)"
         />
       </div>

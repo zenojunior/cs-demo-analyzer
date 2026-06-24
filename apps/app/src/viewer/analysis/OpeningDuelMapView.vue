@@ -227,7 +227,7 @@ const rows = computed(() =>
           mode="dots"
           marker="skull"
           paths
-          :skull-scale="0.6"
+          :marker-scale="0.6"
           :highlight="highlight"
           @jump="(p) => emit('jump', p)"
         />
