@@ -322,9 +322,9 @@ const rangeColor = computed(() => {
     <!-- Grenade detonation heatmap: brings its own filters and plots. -->
     <UtilityHeatmapView v-if="source === 'grenades'" :replay="replay" class="min-h-0 flex-1" />
 
-    <div v-else class="flex min-h-0 flex-1">
-    <!-- Filters panel -->
-    <aside class="flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink-800 bg-ink-900/40 p-4">
+    <div v-else class="flex min-h-0 flex-1 flex-col sm:flex-row">
+    <!-- Filters panel: full width on top on mobile, fixed side column from sm up. -->
+    <aside class="flex max-h-[40vh] w-full shrink-0 flex-col gap-4 overflow-y-auto border-b border-ink-800 bg-ink-900/40 p-4 sm:max-h-none sm:w-64 sm:border-b-0 sm:border-r">
       <!-- Side -->
       <div :class="{ 'pointer-events-none opacity-40': !hasIdentity }">
         <label class="mb-1.5 block text-xs font-medium text-ink-300">{{ t('heatmap.side') }}</label>
@@ -361,7 +361,7 @@ const rangeColor = computed(() => {
     </aside>
 
     <!-- Plots: one per floor (side by side) or a single one -->
-    <div class="relative min-w-0 flex-1">
+    <div class="relative min-h-0 min-w-0 flex-1">
       <div class="flex h-full divide-x divide-ink-800">
         <HeatmapPlot
           v-for="plot in plots"
