@@ -248,6 +248,13 @@ function emphasizeKill(k: KillInfo, w: number) {
   ctx.lineWidth = 2
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'
   ctx.stroke()
+  // Death spot: skull tinted by the victim's side, matching the click selection
+  // so hovering and clicking light up the same path end.
+  const skullImg = skullImage(k.victimColor)
+  if (skullImg) {
+    const s = Math.max(3, L * 0.007) * (props.markerScale ?? 1) * 3.6
+    ctx.drawImage(skullImg, panX + v.fx * w - s / 2, panY + v.fy * w - s / 2, s, s)
+  }
   ctx.restore()
 }
 
