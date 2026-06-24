@@ -4,12 +4,14 @@ import { useI18n } from '@/i18n'
 
 // Canonical production origin; used for <link rel=canonical> and og:url.
 const SITE_URL = 'https://cs2d.app'
-const BRAND = 'CS Demo Analyzer'
+const BRAND = 'CS2d.app'
 
 // Per-route head data keyed by route name. `titleKey` is an i18n key shown
-// before the brand; omit it for the home route (brand only). `descKey` feeds the
-// meta description. Keys resolve through i18n so the head follows the active
-// locale, reusing the page strings we already translate.
+// before the brand; omit it for inner viewer routes (brand only). The home page
+// (path '/') instead appends a descriptive tagline (`seo.homeTitle`) after the
+// brand so the title makes clear what the app is. `descKey` feeds the meta
+// description. Keys resolve through i18n so the head follows the active locale,
+// reusing the page strings we already translate.
 const ROUTE_SEO: Record<string, { titleKey?: string; descKey: string }> = {
   demoviewer: { descKey: 'seo.appDescription' },
   library: { titleKey: 'shell.library', descKey: 'seo.appDescription' },
@@ -52,7 +54,12 @@ export function useSeoHead() {
     [() => route.name, locale],
     () => {
       const seo = ROUTE_SEO[String(route.name)] ?? ROUTE_SEO.demoviewer
-      const title = seo.titleKey ? `${t(seo.titleKey)} · ${BRAND}` : BRAND
+      const title =
+        route.path === '/'
+          ? `${BRAND} · ${t('seo.homeTitle')}`
+          : seo.titleKey
+            ? `${t(seo.titleKey)} · ${BRAND}`
+            : BRAND
       const description = t(seo.descKey)
       const url = SITE_URL + route.path
 

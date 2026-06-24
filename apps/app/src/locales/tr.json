@@ -83,7 +83,8 @@
     "contactBody": "Gizlilikle ilgili sorularınız mı var? Bana {email} adresinden ulaşın."
   },
   "seo": {
-    "appDescription": "Tamamen tarayıcınızda çalışan, Counter-Strike 2 demoları için 2D tekrar görüntüleyici: demolarınız asla makinenizden çıkmaz."
+    "appDescription": "Tamamen tarayıcınızda çalışan, Counter-Strike 2 demoları için 2D tekrar görüntüleyici: demolarınız asla makinenizden çıkmaz.",
+    "homeTitle": "Counter-Strike 2 demoları için 2D tekrar görüntüleyici"
   },
   "tabs": {
     "replay": "2D Replay",

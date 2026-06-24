@@ -83,7 +83,8 @@
     "contactBody": "Masz pytania dotyczące prywatności? Napisz do mnie na {email}."
   },
   "seo": {
-    "appDescription": "Przeglądarka powtórek 2D do dem Counter-Strike 2, która działa w całości w Twojej przeglądarce: Twoje dema nigdy nie opuszczają Twojego komputera."
+    "appDescription": "Przeglądarka powtórek 2D do dem Counter-Strike 2, która działa w całości w Twojej przeglądarce: Twoje dema nigdy nie opuszczają Twojego komputera.",
+    "homeTitle": "Przeglądarka powtórek 2D do dem Counter-Strike 2"
   },
   "tabs": {
     "replay": "Powtórka 2D",

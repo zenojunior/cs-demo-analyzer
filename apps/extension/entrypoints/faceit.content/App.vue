@@ -321,7 +321,7 @@ onUnmounted(() => {
         class="pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100"
         :class="tooltipOnLeft ? 'right-full mr-2' : 'left-full ml-2'"
       >
-        CS Demo Analyzer
+        CS2d.app
       </span>
     </div>
   </div>
@@ -346,7 +346,7 @@ onUnmounted(() => {
           <path fill-rule="evenodd" clip-rule="evenodd" d="M189.984 91.9895H255.984L165 0.989502H99L189.984 91.9895Z" />
           <path fill-rule="evenodd" clip-rule="evenodd" d="M266.492 45.5C284.258 63.2689 311.984 91 311.984 91H402.715L402.016 87.274C395.142 50.634 366.033 17.902 329.38 5.598C314.77 0.693997 306.512 0.00800162 261.996 0.00400162L221 0C221 0 248.726 27.7311 266.492 45.5Z" />
         </svg>
-        CS Demo Analyzer
+        CS2d.app
       </div>
       <div class="flex items-center gap-2">
         <div class="text-xs font-medium">
