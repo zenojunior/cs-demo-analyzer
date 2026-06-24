@@ -282,8 +282,7 @@
     "tabs": {
       "throws": "Lancers",
       "flashes": "Flashes",
-      "damage": "Dégâts",
-      "heatmap": "Heatmap"
+      "damage": "Dégâts"
     },
     "empty": "Aucune donnée utilitaire pour cette démo.",
     "flash": {
@@ -323,6 +322,7 @@
     "kills": "Frags",
     "deaths": "Morts",
     "presence": "Présence",
+    "grenades": "Grenades",
     "level": "Niveau",
     "side": "Camp",
     "both": "Les deux",

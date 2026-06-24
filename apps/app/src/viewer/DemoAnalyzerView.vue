@@ -109,14 +109,14 @@ function goTab(tab: Tab) {
   if (id) router.push(`/${id}${TAB_SEGMENT[tab]}`)
 }
 
-// The heatmap's own pages (presence/kills/deaths), each a separate URL: history
-// demos carry it as a path segment (/:id/heatmaps/kills), external replays as
-// `?h=` (presence is the default, so it has no segment/param).
-type HeatmapSource = 'presence' | 'kills' | 'deaths'
+// The heatmap's own pages (presence/kills/deaths/grenades), each a separate URL:
+// history demos carry it as a path segment (/:id/heatmaps/kills), external
+// replays as `?h=` (presence is the default, so it has no segment/param).
+type HeatmapSource = 'presence' | 'kills' | 'deaths' | 'grenades'
 const heatmapSource = computed<HeatmapSource>(() => {
   const raw = route.params.sub || route.query.h
   const s = Array.isArray(raw) ? raw[0] : raw
-  return s === 'kills' || s === 'deaths' ? s : 'presence'
+  return s === 'kills' || s === 'deaths' || s === 'grenades' ? s : 'presence'
 })
 function goHeatmapSource(src: HeatmapSource) {
   if (currentSrc.value) {
@@ -129,14 +129,14 @@ function goHeatmapSource(src: HeatmapSource) {
   if (id) router.push(`/${id}/heatmaps${src === 'presence' ? '' : `/${src}`}`)
 }
 
-// The utilities tab's own pages (throws/flashes/damage/heatmap), each a separate
-// URL: history demos carry it as a path segment (/:id/utilities/flashes),
-// external replays as `?u=` (throws is the default, so it has no segment/param).
-type UtilitySub = 'throws' | 'flashes' | 'damage' | 'heatmap'
+// The utilities tab's own pages (throws/flashes/damage), each a separate URL:
+// history demos carry it as a path segment (/:id/utilities/flashes), external
+// replays as `?u=` (throws is the default, so it has no segment/param).
+type UtilitySub = 'throws' | 'flashes' | 'damage'
 const utilitySub = computed<UtilitySub>(() => {
   const raw = route.params.sub || route.query.u
   const s = Array.isArray(raw) ? raw[0] : raw
-  return s === 'flashes' || s === 'damage' || s === 'heatmap' ? s : 'throws'
+  return s === 'flashes' || s === 'damage' ? s : 'throws'
 })
 function goUtilitySub(sub: UtilitySub) {
   if (currentSrc.value) {

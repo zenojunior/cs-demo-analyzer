@@ -282,8 +282,7 @@
     "tabs": {
       "throws": "Würfe",
       "flashes": "Flashes",
-      "damage": "Schaden",
-      "heatmap": "Heatmap"
+      "damage": "Schaden"
     },
     "empty": "Keine Utility-Daten für dieses Demo.",
     "flash": {
@@ -323,6 +322,7 @@
     "kills": "Kills",
     "deaths": "Tode",
     "presence": "Präsenz",
+    "grenades": "Granaten",
     "level": "Ebene",
     "side": "Seite",
     "both": "Beide",

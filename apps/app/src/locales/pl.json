@@ -282,8 +282,7 @@
     "tabs": {
       "throws": "Rzuty",
       "flashes": "Flashe",
-      "damage": "Obrażenia",
-      "heatmap": "Heatmapa"
+      "damage": "Obrażenia"
     },
     "empty": "Brak danych o utility dla tego dema.",
     "flash": {
@@ -323,6 +322,7 @@
     "kills": "Zabójstwa",
     "deaths": "Śmierci",
     "presence": "Obecność",
+    "grenades": "Granaty",
     "level": "Poziom",
     "side": "Strona",
     "both": "Obie",

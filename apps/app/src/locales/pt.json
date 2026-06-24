@@ -282,8 +282,7 @@
     "tabs": {
       "throws": "Lançamentos",
       "flashes": "Flashes",
-      "damage": "Dano",
-      "heatmap": "Heatmap"
+      "damage": "Dano"
     },
     "empty": "Sem dados de utilitárias para esta demo.",
     "flash": {
@@ -323,6 +322,7 @@
     "kills": "Abates",
     "deaths": "Mortes",
     "presence": "Presença",
+    "grenades": "Granadas",
     "level": "Nível",
     "side": "Lado",
     "both": "Ambos",
