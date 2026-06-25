@@ -179,6 +179,18 @@ export interface CellDetail {
   sub?: string
   /** Replay seek target, when the line is clickable. */
   jump?: { roundIndex: number; t: number }
+  /** When present, clicking the line opens a looping mini-clip popover of the
+   *  moment (with a "watch in match" button) instead of seeking straight away. */
+  clip?: {
+    round: number
+    /** "Watch in match" seek target (seconds since freeze). */
+    jumpT: number
+    /** Clip window within the round (seconds since freeze). */
+    from: number
+    to: number
+    /** Players to frame in the clip (e.g. flasher + victim + killer). */
+    focusSteamIds: string[]
+  }
 }
 
 /** A single flash that led to a kill, for the drill-down popover. */

@@ -15,7 +15,8 @@ import { useI18n } from '@/i18n'
  * Map of the opening duels: the shooter -> victim path of every round's first
  * kill, colored by the side that won the opening. A side list (who killed whom,
  * at what round time) drives it: hovering a row highlights its path, clicking it
- * seeks the 2D replay. Mirrors the Utilities throws page (list + radar).
+ * opens the kill popover (a looping mini-clip of the moment, with a "watch in
+ * match" button that seeks the 2D replay). Mirrors the Utilities throws page.
  */
 const props = defineProps<{ replay: Replay }>()
 
@@ -32,6 +33,9 @@ const { t } = useI18n()
 const teamFilter = ref<string>('all')
 /** The engagement whose path is emphasized on the map (hovered list row). */
 const highlight = ref<{ roundIndex: number; t: number } | null>(null)
+/** The engagement whose kill popover (mini-clip) is open, from a clicked row. A
+ *  fresh object each click so re-clicking the same row reopens it. */
+const openKill = ref<{ roundIndex: number; t: number } | null>(null)
 
 // Stable teams (0 = started CT, 1 = started T) for the filter.
 const teams = computed(() => {
@@ -96,6 +100,8 @@ const points = computed<DuelPoint[]>(() => {
         roundIndex: d.roundIndex,
         t: d.t,
         roundNumber: d.roundNumber,
+        attackerSteamId: d.winnerSteamId,
+        victimSteamId: d.loserSteamId,
         attackerName: nameById.value.get(d.winnerSteamId) ?? '?',
         attackerColor: d.winnerSide ? SIDE_COLOR[d.winnerSide] : '#cbd5e1',
         victimName: nameById.value.get(d.loserSteamId) ?? '?',
@@ -195,7 +201,7 @@ const rows = computed(() =>
           <button
             type="button"
             class="flex w-full cursor-pointer items-center gap-2 overflow-hidden rounded px-2 py-1.5 text-left transition-colors hover:bg-ink-800"
-            @click="emit('jump', { roundIndex: row.roundIndex, t: row.t })"
+            @click="openKill = { roundIndex: row.roundIndex, t: row.t }"
             @mouseenter="highlight = { roundIndex: row.roundIndex, t: row.t }"
           >
             <span class="w-7 shrink-0 font-mono text-[11px] text-ink-500">R{{ row.roundNumber }}</span>
@@ -224,12 +230,15 @@ const rows = computed(() =>
           :points="plot.points"
           :calibration="calibration"
           :radar="plot.radar"
+          :replay="replay"
           :label="plot.label"
+          subject="attacker"
           mode="dots"
           marker="skull"
           paths
           :marker-scale="0.6"
           :highlight="highlight"
+          :open-kill="openKill"
           @jump="(p) => emit('jump', p)"
         />
       </div>

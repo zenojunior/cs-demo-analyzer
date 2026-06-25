@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { type MapCalibration, worldToFraction } from '@/viewer/domain/calibration'
-import type { Side } from '@/viewer/domain/schema'
+import type { Replay, Side } from '@/viewer/domain/schema'
 import { SIDE_COLOR } from '@/viewer/domain/colors'
 import type { KillInfo } from '@/viewer/analysis/heatmapTypes'
+import ReplayClipPopover from '@/viewer/player/ReplayClipPopover.vue'
 import UiIcon from '@/ui/UiIcon.vue'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
+
+// Clip window shown in the kill popover: a few seconds of lead-up to the kill
+// and a short tail after it, looped.
+const CLIP_LEAD = 6
+const CLIP_TAIL = 2
 
 /**
  * A single map plot: one floor's radar with either a heat layer (`mode: 'heat'`)
@@ -21,6 +27,9 @@ const props = defineProps<{
   calibration: MapCalibration
   /** Radar image of this floor. */
   radar: string
+  /** In-memory replay, so a clicked kill can show a looping mini-clip of the
+   *  moment in the popover (kills/deaths plots only). */
+  replay?: Replay
   /** Floor label (e.g. "Upper"); omitted on single-level maps. */
   label?: string
   /** 'heat' (density blobs) or 'dots' (one marker per point). Defaults to heat. */
@@ -36,6 +45,13 @@ const props = defineProps<{
   /** Scale of the dot / skull markers (1 = default). The opening-duel map and the
    *  kills/deaths heatmaps use a smaller one for a tighter, less cluttered look. */
   markerScale?: number
+  /** Open the kill popover for this engagement (round + instant) from the outside,
+   *  e.g. a click in a side list. Only the plot that holds the marker opens it;
+   *  the others close theirs (the kill is on another floor). */
+  openKill?: { roundIndex: number; t: number } | null
+  /** Whose name the popover marks as the one being observed (a red eye next to
+   *  it): the attacker (kills) or the victim (deaths). */
+  subject?: 'attacker' | 'victim'
 }>()
 
 const emit = defineEmits<{ jump: [payload: { roundIndex: number; t: number }] }>()
@@ -528,6 +544,86 @@ function jumpToSelected() {
   selected.value = null
 }
 
+/** Opens the kill popover for an engagement (round + instant) driven from the
+ *  outside. Anchors at the marker (its death spot), like a click on it; closes
+ *  this plot's popover when the kill isn't here (it lives on another floor). */
+function openKillPopover(target: { roundIndex: number; t: number } | null) {
+  const p = target
+    ? props.points.find(
+        (pt) => pt.kill && pt.kill.roundIndex === target.roundIndex && pt.kill.t === target.t,
+      )
+    : null
+  if (!p?.kill) {
+    selected.value = null
+    return
+  }
+  const w = L * zoom.value
+  const { fx, fy } = worldToFraction(props.calibration, p.x, p.y)
+  selected.value = { wx: p.x, wy: p.y, sx: panX + fx * w, sy: panY + fy * w, kill: p.kill }
+  render()
+}
+watch(() => props.openKill, (v) => openKillPopover(v ?? null))
+
+// The two players to frame in the clip (attacker + victim); empty for a
+// world/suicide death, where the clip falls back to auto zoom.
+const clipFocus = computed(() => {
+  const k = selected.value?.kill
+  if (!k) return []
+  return [k.attackerSteamId, k.victimSteamId].filter((s): s is string => !!s)
+})
+
+// The player this aspect observes (a red eye before their name in the clip): the
+// attacker on the kills map, the victim on the deaths map.
+const observedSteamId = computed(() => {
+  const k = selected.value?.kill
+  if (!k) return null
+  return props.subject === 'attacker'
+    ? k.attackerSteamId
+    : props.subject === 'victim'
+      ? k.victimSteamId
+      : null
+})
+
+/** World -> canvas-local px, with the current zoom/pan (mirrors `render`). */
+function worldToCanvas(wx: number, wy: number) {
+  const w = L * zoom.value
+  const { fx, fy } = worldToFraction(props.calibration, wx, wy)
+  return { x: panX + fx * w, y: panY + fy * w }
+}
+
+// Virtual anchor for the kill popover, in viewport coords. `selected.sx/sy`
+// (canvas-local px) track the marker through zoom/pan; a new object identity on
+// each move tells floating-ui to reposition, and the rect is read live so it
+// also follows page scroll. When the plot draws shooter->victim paths (opening
+// duels), the anchor spans that whole segment so the card lands beside it rather
+// than on top of the line.
+const reference = computed(() => {
+  const s = selected.value
+  const sx = s?.sx ?? 0
+  const sy = s?.sy ?? 0
+  const k = s?.kill
+  const spanPath = !!(props.paths && k && k.ax != null && k.ay != null)
+  return {
+    getBoundingClientRect: () => {
+      const rect = wrap.value?.getBoundingClientRect()
+      const ox = rect?.left ?? 0
+      const oy = rect?.top ?? 0
+      if (spanPath && k) {
+        const a = worldToCanvas(k.ax!, k.ay!)
+        const v = worldToCanvas(k.vx, k.vy)
+        const left = ox + Math.min(a.x, v.x)
+        const top = oy + Math.min(a.y, v.y)
+        const right = ox + Math.max(a.x, v.x)
+        const bottom = oy + Math.max(a.y, v.y)
+        return { x: left, y: top, width: right - left, height: bottom - top, left, top, right, bottom }
+      }
+      const x = ox + sx
+      const y = oy + sy
+      return { x, y, width: 0, height: 0, top: y, left: x, right: x, bottom: y }
+    },
+  }
+})
+
 function zoomBy(factor: number) {
   const cx = cw / 2
   const cy = ch / 2
@@ -598,46 +694,53 @@ const canReset = computed(() => zoom.value > 1.0001)
       {{ label }}
     </div>
 
-    <!-- Kill popover: who killed whom at this spot; click to seek the replay. -->
-    <button
-      v-if="selected"
-      type="button"
-      class="absolute z-10 flex -translate-x-1/2 -translate-y-full cursor-pointer flex-col gap-0.5 rounded-lg border border-ink-700 bg-ink-900/95 px-2.5 py-1.5 text-xs shadow-lg backdrop-blur transition-colors hover:border-surge-500/60"
-      :style="{ left: `${selected.sx}px`, top: `${selected.sy - 10}px` }"
-      @click="jumpToSelected"
+    <!-- Kill popover: who killed whom at this spot, a looping mini-clip of the
+         moment, and a button to open it in the full replay. The canvas drives
+         dismissal (a plain click), so the card stays through a pan drag. -->
+    <ReplayClipPopover
+      v-if="selected && replay"
+      :reference="reference"
+      :replay="replay"
+      :round="selected.kill.roundIndex"
+      :jump-t="selected.kill.t"
+      :from="selected.kill.t - CLIP_LEAD"
+      :to="selected.kill.t + CLIP_TAIL"
+      :focus-steam-ids="clipFocus"
+      :observed-steam-id="observedSteamId"
+      :radar-src="radar"
+      :dismiss-on-outside="false"
+      @jump="jumpToSelected"
+      @close="selected = null"
     >
-      <div class="flex items-center gap-1.5 whitespace-nowrap">
+      <template #header>
         <span
           v-if="selected.kill.attackerName"
-          class="font-medium"
+          class="truncate font-medium"
           :style="{ color: selected.kill.attackerColor }"
           >{{ selected.kill.attackerName }}</span
         >
         <template v-if="selected.kill.assistedFlash">
           <span class="font-medium" :style="{ color: selected.kill.attackerColor }">+</span>
-          <img src="/weapons/flash.svg" alt="flash" class="h-3.5 w-3.5 object-contain" />
+          <img src="/weapons/flash.svg" alt="flash" class="h-3.5 w-3.5 shrink-0 object-contain" />
         </template>
         <img
           v-if="selected.kill.weaponIcon"
           :src="selected.kill.weaponIcon"
           :alt="selected.kill.weapon"
-          class="h-3 w-7 object-contain"
+          class="h-3 w-7 shrink-0 object-contain"
         />
-        <span v-else class="text-ink-400">{{ selected.kill.weapon }}</span>
+        <span v-else class="shrink-0 text-ink-400">{{ selected.kill.weapon }}</span>
         <img
           v-if="selected.kill.headshot"
           src="/weapons/headshot.svg"
           :alt="t('viewer.headshot')"
-          class="h-3.5 w-3.5 object-contain"
+          class="h-3.5 w-3.5 shrink-0 object-contain"
         />
-        <span class="font-medium" :style="{ color: selected.kill.victimColor }">{{
+        <span class="truncate font-medium" :style="{ color: selected.kill.victimColor }">{{
           selected.kill.victimName
         }}</span>
-      </div>
-      <div class="text-[0.65rem] text-ink-400">
-        {{ t('viewer.round') }} {{ selected.kill.roundNumber }} · {{ t('heatmap.jumpHint') }}
-      </div>
-    </button>
+      </template>
+    </ReplayClipPopover>
 
     <!-- Controles de zoom -->
     <div class="absolute bottom-4 right-4 flex flex-col gap-1">

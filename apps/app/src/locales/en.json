@@ -332,6 +332,8 @@
     "round": "Round",
     "allRounds": "All rounds",
     "jumpHint": "click to watch",
+    "watchInMatch": "Watch in match",
+    "close": "Close",
     "time": "Round time",
     "multiLevelNote": "{map} has two floors: each plot shows one level.",
     "team": "Team"

@@ -170,6 +170,8 @@ function killInfo(round: Round, idx: number, ev: Extract<Round['events'][number]
     roundIndex: idx,
     t: ev.t,
     roundNumber: round.number,
+    attackerSteamId: ev.attackerSteamId ?? null,
+    victimSteamId: ev.victimSteamId,
     attackerName: ev.attackerSteamId ? (nameById.value.get(ev.attackerSteamId) ?? '?') : null,
     attackerColor: aSide ? SIDE_COLOR[aSide] : '#cbd5e1',
     victimName: nameById.value.get(ev.victimSteamId) ?? '?',
@@ -374,6 +376,8 @@ const rangeColor = computed(() => {
           :points="plot.points"
           :calibration="calibration"
           :radar="plot.radar"
+          :replay="replay"
+          :subject="source === 'kills' ? 'attacker' : source === 'deaths' ? 'victim' : undefined"
           :label="plot.label"
           :mode="plotMode"
           :marker="plotMarker"

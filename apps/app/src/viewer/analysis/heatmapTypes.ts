@@ -8,6 +8,10 @@ export interface KillInfo {
   roundIndex: number
   t: number
   roundNumber: number
+  /** Killer + victim steamIds, so a clip can frame both players of the duel
+   *  (attacker is null for world/suicide deaths). */
+  attackerSteamId: string | null
+  victimSteamId: string
   attackerName: string | null
   attackerColor: string
   victimName: string

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Replay } from '@/viewer/domain/schema'
 import type { CellDetail, Team } from '@/viewer/analysis/utilityStats'
 import UtilityGridCell from '@/viewer/analysis/UtilityGridCell.vue'
 import { useI18n } from '@/i18n'
@@ -24,6 +25,9 @@ defineProps<{
     details?: (steamId: string) => CellDetail[]
     best?: (steamId: string) => boolean
   }[]
+  /** In-memory replay, so detail lines carrying `clip` info can open a mini-clip
+   *  popover (passed straight to the cells). */
+  replay?: Replay
 }>()
 
 const emit = defineEmits<{
@@ -85,6 +89,7 @@ const TEAM_COLOR = ['#e0b341', '#6b78e0'] as const
             <UtilityGridCell
               :value="row.value(p.steamId)"
               :details="row.details?.(p.steamId)"
+              :replay="replay"
               @jump="(payload) => emit('jump', payload)"
             />
             <span
@@ -100,6 +105,7 @@ const TEAM_COLOR = ['#e0b341', '#6b78e0'] as const
             <UtilityGridCell
               :value="row.value(p.steamId)"
               :details="row.details?.(p.steamId)"
+              :replay="replay"
               @jump="(payload) => emit('jump', payload)"
             />
             <span

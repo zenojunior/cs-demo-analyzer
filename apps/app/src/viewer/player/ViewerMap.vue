@@ -39,6 +39,16 @@ const props = defineProps<{
   autoZoom?: boolean
   /** Follow a player: zoom in and keep this steamId centered (overrides auto zoom). */
   followSteamId?: string | null
+  /** Frame just these players (e.g. the two in a kill), ignoring the rest. Like
+   *  auto zoom but restricted to this subset, so it zooms in tighter. Players are
+   *  kept framed even once dead, so the death spot stays in view. */
+  focusSteamIds?: string[] | null
+  /** Frame (and track) a moving world point, e.g. a grenade along its arc.
+   *  Takes precedence over the player-based camera modes while set. */
+  focusWorld?: { x: number; y: number } | null
+  /** Player this view observes (e.g. an embedded kill/death clip): a small red
+   *  eye is drawn just before their name, so it reads who the clip is about. */
+  observedSteamId?: string | null
   /** Performance mode: draw smoke/fire as flat circles (no gradients/blur). */
   lowQualityEffects?: boolean
   /** Arc to highlight in full (grenades hover): when set, only this one shows. */
@@ -184,6 +194,18 @@ function s2w(sx: number, sy: number) {
   const fy = (sy - panY) / (L * zoom.value)
   return worldFromFraction(props.calibration, fx, fy)
 }
+
+/** World (game units) -> viewport client coords, using the live zoom/pan and the
+ *  canvas position. Lets a host pin a floating element (e.g. a clip popover) to a
+ *  spot on the map. Null until the canvas is laid out. */
+function worldToClient(wx: number, wy: number): { x: number; y: number } | null {
+  const cv = canvas.value
+  if (!cv || L === 0) return null
+  const { x, y } = w2s(wx, wy)
+  const rect = cv.getBoundingClientRect()
+  return { x: rect.left + x, y: rect.top + y }
+}
+defineExpose({ worldToClient })
 
 // Dot radius sized in game units (~hitbox), so it grows with the map on zoom
 // ("real" size). The clamp only keeps it from disappearing / blowing up.
@@ -542,6 +564,34 @@ function drawVoiceMini(side: Side, name: string, cx: number, cy: number, font: s
   ctx.restore()
 }
 
+/**
+ * "Observed" indicator: a small red eye tucked to the left of the name label,
+ * marking the player a clip is centered on (the killer / the victim). `cx`/`cy`/
+ * `font`/`bh` mirror the name's `drawLabel` so it aligns with the box edge.
+ */
+function drawEyeMini(name: string, cx: number, cy: number, font: string, bh: number) {
+  if (!ctx || !name) return
+  ctx.save()
+  ctx.font = font
+  const tw = ctx.measureText(name).width
+  const leftEdge = cx - tw / 2 - 4 // 4 = padX of the name box in drawLabel
+  const h = bh * 0.6
+  const w = h * 1.6
+  const ex = leftEdge - w / 2 - 2
+  ctx.strokeStyle = '#ef4444'
+  ctx.fillStyle = '#ef4444'
+  ctx.lineWidth = Math.max(1, h * 0.16)
+  // almond outline
+  ctx.beginPath()
+  ctx.ellipse(ex, cy, w / 2, h / 2, 0, 0, Math.PI * 2)
+  ctx.stroke()
+  // pupil
+  ctx.beginPath()
+  ctx.arc(ex, cy, h * 0.26, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+}
+
 /** Is the player on the active floor? Without multi-level, everyone counts. */
 function onActiveLevel(p: PlayerState) {
   const lvl = props.levelRange
@@ -652,6 +702,16 @@ function drawPlayer(p: PlayerState, death: { x: number; y: number } | undefined)
     if (props.talking?.has(p.steamId) && !props.muted?.[p.side]) {
       drawVoiceMini(
         p.side,
+        name,
+        x,
+        y - r - 9 * lblScale,
+        `600 ${(10 * lblScale).toFixed(1)}px Inter, sans-serif`,
+        14 * lblScale,
+      )
+    }
+    // Observed player stays marked after death (e.g. the victim's death spot).
+    if (props.observedSteamId === p.steamId) {
+      drawEyeMini(
         name,
         x,
         y - r - 9 * lblScale,
@@ -790,6 +850,10 @@ function drawPlayer(p: PlayerState, death: { x: number; y: number } | undefined)
       `600 ${(11 * lblScale).toFixed(1)}px Inter, sans-serif`,
       nameBh,
     )
+  }
+  // red eye before the name of the player this clip observes (the killer/victim)
+  if (props.observedSteamId === p.steamId) {
+    drawEyeMini(name, x, nameY, `600 ${(11 * lblScale).toFixed(1)}px Inter, sans-serif`, nameBh)
   }
   ctx.restore() // end labels jump offset
 }
@@ -1523,11 +1587,40 @@ const AUTO_PAD = 0.22 // padding (fraction of the screen) around the players bbo
 const AUTO_EASE = 0.1 // smoothing per frame (higher is faster)
 const AUTO_MIN_SPAN = 0.045 // min bbox (fraction) to avoid blowing up the zoom on a cluster
 const AUTO_ZOOM_MAX = 2.4 // zoom-in cap: does not get too close to the players
+const FOCUS_ZOOM_MAX = 4.5 // tighter cap when framing a focused subset (e.g. a kill)
+const FOCUS_POINT_ZOOM = 3.8 // zoom held while tracking a moving world point (tight, so it reads)
+const FOCUS_POINT_EASE = 0.3 // snappier easing so a fast point (a grenade) stays centered at that zoom
 
-/** Alvo de zoom/pan que enquadra os jogadores vivos (fallback: todos). */
+/** Whether the auto-zoom loop should run: tracking a world point, framing all
+ *  players or a focused subset, unless a single-player follow takes precedence. */
+function autoActive(): boolean {
+  return (
+    !props.followSteamId &&
+    (!!props.autoZoom || !!props.focusSteamIds?.length || !!props.focusWorld)
+  )
+}
+
+/** Alvo de zoom/pan: o ponto do mundo rastreado (`focusWorld`, prioridade), ou os
+ *  jogadores vivos (fallback: todos), ou apenas o subconjunto em foco. */
 function autoTarget(): { zoom: number; panX: number; panY: number } | null {
-  let pts = props.players.filter((p) => p.alive)
-  if (!pts.length) pts = props.players // round ended: use the last positions
+  if (props.focusWorld) {
+    if (L === 0) return null
+    const { fx, fy } = worldToFraction(props.calibration, props.focusWorld.x, props.focusWorld.y)
+    const z = FOCUS_POINT_ZOOM
+    return { zoom: z, panX: cw / 2 - fx * L * z, panY: ch / 2 - fy * L * z }
+  }
+  const focus = props.focusSteamIds
+  let pts: PlayerState[]
+  let zoomMax = AUTO_ZOOM_MAX
+  if (focus?.length) {
+    // Framed subset: keep them even when dead, so the death spot stays in view.
+    const set = new Set(focus)
+    pts = props.players.filter((p) => set.has(p.steamId))
+    zoomMax = FOCUS_ZOOM_MAX
+  } else {
+    pts = props.players.filter((p) => p.alive)
+    if (!pts.length) pts = props.players // round ended: use the last positions
+  }
   if (!pts.length || L === 0) return null
 
   let fxMin = Infinity
@@ -1547,7 +1640,7 @@ function autoTarget(): { zoom: number; panX: number; panY: number } | null {
   const dfy = Math.max(fyMax - fyMin, AUTO_MIN_SPAN)
   const availW = cw * (1 - AUTO_PAD * 2)
   const availH = ch * (1 - AUTO_PAD * 2)
-  const z = clamp(Math.min(availW / (dfx * L), availH / (dfy * L)), 0.5, AUTO_ZOOM_MAX)
+  const z = clamp(Math.min(availW / (dfx * L), availH / (dfy * L)), 0.5, zoomMax)
   return { zoom: z, panX: cw / 2 - cfx * L * z, panY: ch / 2 - cfy * L * z }
 }
 
@@ -1555,9 +1648,10 @@ let autoRaf = 0
 function autoStep() {
   const tgt = autoTarget()
   if (tgt) {
-    zoom.value += (tgt.zoom - zoom.value) * AUTO_EASE
-    panX += (tgt.panX - panX) * AUTO_EASE
-    panY += (tgt.panY - panY) * AUTO_EASE
+    const ease = props.focusWorld ? FOCUS_POINT_EASE : AUTO_EASE
+    zoom.value += (tgt.zoom - zoom.value) * ease
+    panX += (tgt.panX - panX) * ease
+    panY += (tgt.panY - panY) * ease
   }
   draw()
   autoRaf = requestAnimationFrame(autoStep)
@@ -1567,11 +1661,10 @@ function stopAuto() {
   autoRaf = 0
 }
 watch(
-  () => props.autoZoom,
-  (on) => {
-    if (props.followSteamId) return // follow takes precedence over auto zoom
-    if (on && !autoRaf) autoRaf = requestAnimationFrame(autoStep)
-    else if (!on) stopAuto()
+  [() => props.autoZoom, () => props.focusSteamIds, () => !!props.focusWorld],
+  () => {
+    if (autoActive() && !autoRaf) autoRaf = requestAnimationFrame(autoStep)
+    else if (!autoActive()) stopAuto()
   },
 )
 
@@ -1618,8 +1711,8 @@ watch(
       if (!followRaf) followRaf = requestAnimationFrame(followStep)
     } else {
       stopFollow()
-      // Hand back to auto zoom if it's still enabled.
-      if (props.autoZoom && !autoRaf) autoRaf = requestAnimationFrame(autoStep)
+      // Hand back to auto zoom / focus framing if either is still enabled.
+      if (autoActive() && !autoRaf) autoRaf = requestAnimationFrame(autoStep)
     }
   },
 )
@@ -2294,6 +2387,12 @@ onMounted(() => {
   ro = new ResizeObserver(resize)
   if (wrap.value) ro.observe(wrap.value)
   resize()
+  // Focus framing is set from the start (e.g. an embedded clip), so kick the
+  // auto-zoom loop on mount: unlike the autoZoom toggle, it has no off->on edge
+  // for the watch above to catch.
+  if ((props.focusSteamIds?.length || props.focusWorld) && !autoRaf) {
+    autoRaf = requestAnimationFrame(autoStep)
+  }
 })
 onUnmounted(() => {
   ro?.disconnect()

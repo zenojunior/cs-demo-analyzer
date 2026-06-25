@@ -13,6 +13,7 @@ import { MAP_CALIBRATION } from '@/viewer/domain/calibration'
 import { SIDE_COLOR } from '@/viewer/domain/colors'
 import { KIND_ORDER, grenadeIconStyle as iconStyle } from '@/viewer/domain/grenades'
 import ViewerMap from '@/viewer/player/ViewerMap.vue'
+import ReplayClipPopover from '@/viewer/player/ReplayClipPopover.vue'
 import UiSelect from '@/ui/UiSelect.vue'
 import { useI18n } from '@/i18n'
 
@@ -217,9 +218,66 @@ function fmtTime(t: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+// Clip window around a throw: a touch before it and a few seconds after, to see
+// the grenade fly and land/detonate.
+const CLIP_LEAD = 2
+const CLIP_TAIL = 6
+
+// Clicking a throw opens a looping mini-clip of it; "watch in match" inside still
+// seeks the 2D replay. The popover pins to the throw's impact spot on the map.
+const selectedThrow = ref<Throw | null>(null)
+const mapRef = ref<InstanceType<typeof ViewerMap> | null>(null)
 function onPick(t: Throw) {
-  emit('jump', { roundIndex: t.roundIndex, t: t.t })
+  selectedThrow.value = t
+  // Show the clicked throw's floor while its clip is open (multi-level maps).
+  if (mapLevels.value && t.floor != null) activeLevel.value = t.floor
 }
+
+/** Virtual anchor spanning the whole throw arc on the map (viewport coords),
+ *  read live so it tracks zoom/pan. Using the arc's bounding box (not a single
+ *  point) lets floating-ui place the card beside the arc instead of over it. */
+const throwReference = computed(() => {
+  const pts = selectedThrow.value?.path.points ?? null
+  return {
+    getBoundingClientRect: () => {
+      const map = mapRef.value
+      const empty = { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 }
+      if (!pts?.length || !map) return empty
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const p of pts) {
+        const c = map.worldToClient(p.x, p.y)
+        if (!c) continue
+        minX = Math.min(minX, c.x)
+        maxX = Math.max(maxX, c.x)
+        minY = Math.min(minY, c.y)
+        maxY = Math.max(maxY, c.y)
+      }
+      if (!Number.isFinite(minX)) return empty
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+        left: minX,
+        top: minY,
+        right: maxX,
+        bottom: maxY,
+      }
+    },
+  }
+})
+
+/** Floor radar + Z range for the selected throw's clip (multi-level maps). */
+const selectedThrowFloor = computed(() => {
+  const s = selectedThrow.value
+  const lvl = s && s.floor != null ? mapLevels.value?.[s.floor] : null
+  return lvl
+    ? { radar: lvl.radar ?? calibration.value.radar, range: { minZ: lvl.minZ, maxZ: lvl.maxZ } }
+    : null
+})
 
 /** Preview a throw's arc and flip the map to its floor. */
 function onHover(t: Throw) {
@@ -331,6 +389,7 @@ function onLeave() {
     <!-- Radar: prévia do arco da granada em foco -->
     <div class="relative min-h-0 min-w-0 flex-1">
       <ViewerMap
+        ref="mapRef"
         :players="[]"
         :current-t="0"
         :round="null"
@@ -340,7 +399,7 @@ function onLeave() {
         :radar-src="displayRadar"
         :level-range="displayRange"
         :preview-paths="filteredPaths"
-        :preview-path="previewPath"
+        :preview-path="previewPath ?? selectedThrow?.path ?? null"
       />
 
       <!-- Floor selector (multi-level maps only, e.g. Nuke): over the radar,
@@ -372,5 +431,34 @@ function onLeave() {
         {{ tr('grenades.hint') }}
       </p>
     </div>
+
+    <!-- Clip of the clicked throw, pinned to its row (to the side, over the map). -->
+    <ReplayClipPopover
+      v-if="selectedThrow"
+      :reference="throwReference"
+      :replay="replay"
+      :round="selectedThrow.roundIndex"
+      :jump-t="selectedThrow.t"
+      :from="selectedThrow.t - CLIP_LEAD"
+      :to="selectedThrow.t + CLIP_TAIL"
+      :follow-path="selectedThrow.path.points"
+      :observed-steam-id="selectedThrow.throwerSteamId"
+      :radar-src="selectedThrowFloor?.radar"
+      :level-range="selectedThrowFloor?.range ?? null"
+      track-anchor
+      @jump="(p) => emit('jump', p)"
+      @close="selectedThrow = null"
+    >
+      <template #header>
+        <span class="h-4 w-4 shrink-0" :style="iconStyle(selectedThrow.kind)" />
+        <span
+          class="truncate font-medium"
+          :style="selectedThrow.side ? { color: SIDE_COLOR[selectedThrow.side] } : undefined"
+        >
+          {{ selectedThrow.throwerName || tr('grenades.unknown') }}
+        </span>
+        <span class="shrink-0 text-ink-400">{{ kindLabel(selectedThrow.kind) }}</span>
+      </template>
+    </ReplayClipPopover>
   </div>
 </template>
