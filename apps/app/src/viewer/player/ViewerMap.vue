@@ -16,6 +16,7 @@ import {
 } from '@/viewer/player/coachTools'
 import type { GrenadeKind } from '@/viewer/domain/schema'
 import { createGrenadeEffects, paintSimpleSmoke, paintSimpleFire } from '@/viewer/player/grenadeEffects'
+import { useGrenadeRendering } from '@/viewer/player/useGrenadeRendering'
 import { clamp, drawKill, roundRect, wrapText } from '@/viewer/player/canvasUtils'
 import { useViewerAssets } from '@/viewer/player/useViewerAssets'
 import { useI18n } from '@/i18n'
@@ -137,6 +138,11 @@ let panY = 0
 const radar = new Image()
 let radarReady = false
 
+// Per-player jump "lift" [0,1] for the current frame, derived from the Z baseline
+// (see computeJumpLift). 0 = grounded, 1 = at the apex of a jump. Recomputed once
+// per draw and read by drawPlayer to offset the body off a ground shadow.
+let liftMap = new Map<string, number>()
+
 // Mic/weapon/comment icon assets, preloaded; redraw as each image loads.
 const { micImgs, weaponImgs, kindIconPaths } = useViewerAssets(() => draw())
 
@@ -201,267 +207,28 @@ function playerPose(p: PlayerState): { x: number; y: number; yaw: number } {
   return coachPosOf(p) ?? { x: p.x, y: p.y, yaw: p.yaw }
 }
 
-/** Effect radius (screen px) of a smoke/fire grenade, for rendering and hit-test. */
-function smokeRadius() {
-  return unitsToScreen(144)
-}
-function fireRadius() {
-  return unitsToScreen(150)
-}
-
-function drawGrenade(
-  ev: Extract<Round['events'][number], { type: 'grenade' }>,
-  t: number,
-) {
-  if (!ctx) return
-  // Multi-floor maps: only the floor where the grenade went off (effect + timer).
-  if (!zOnActiveLevel(ev.z)) return
-  const { x, y } = w2s(ev.x, ev.y)
-  const span = Math.max(0.001, ev.endT - ev.t)
-  const k = clamp((t - ev.t) / span, 0, 1)
-  ctx.save()
-  if (ev.kind === 'smoke') {
-    if (props.lowQualityEffects) paintSimpleSmoke(ctx, x, y, smokeRadius())
-    else effects.paintSmoke(ctx, x, y, smokeRadius(), t, ev.x * 0.011 + ev.y * 0.015)
-  } else if (ev.kind === 'fire') {
-    if (props.lowQualityEffects) paintSimpleFire(ctx, x, y, fireRadius())
-    else effects.paintFire(ctx, x, y, fireRadius(), t, ev.x * 0.013 + ev.y * 0.017)
-  } else if (ev.kind === 'he') {
-    ctx.globalAlpha = 1 - k
-    ctx.strokeStyle = '#ffb020'
-    ctx.lineWidth = 2.5
-    ctx.beginPath()
-    ctx.arc(x, y, unitsToScreen(60) * (0.6 + k * 0.8), 0, Math.PI * 2)
-    ctx.stroke()
-  } else if (ev.kind === 'flash') {
-    ctx.globalAlpha = (1 - k) * 0.7
-    ctx.fillStyle = '#ffffff'
-    ctx.beginPath()
-    ctx.arc(x, y, unitsToScreen(70), 0, Math.PI * 2)
-    ctx.fill()
-  }
-  ctx.restore()
-  // Countdown for lingering effects (smoke dissipating / fire burning out).
-  if (ev.kind === 'smoke' || ev.kind === 'fire') {
-    drawGrenadeTimer(x, y, ev.endT - t, span, ev.kind)
-  }
-}
-
-/** Compact circular countdown shown at the center of a smoke/fire effect. The
- *  ring drains clockwise as the effect runs out and the remaining whole seconds
- *  are printed in the middle. */
-function drawGrenadeTimer(
-  x: number,
-  y: number,
-  remaining: number,
-  span: number,
-  kind: 'smoke' | 'fire',
-) {
-  if (!ctx) return
-  const p = clamp(remaining / span, 0, 1)
-  const radius = 11
-  const color = kind === 'smoke' ? 'rgba(232, 236, 244, 0.95)' : 'rgba(255, 150, 60, 0.98)'
-  ctx.save()
-  ctx.lineCap = 'round'
-  // track
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)'
-  ctx.lineWidth = 3.5
-  ctx.beginPath()
-  ctx.arc(x, y, radius, 0, Math.PI * 2)
-  ctx.stroke()
-  // remaining time (drains clockwise from the top)
-  ctx.strokeStyle = color
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2)
-  ctx.stroke()
-  // remaining whole seconds in the middle
-  ctx.fillStyle = color
-  ctx.font = '700 11px system-ui, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'
-  ctx.shadowBlur = 3
-  ctx.fillText(String(Math.max(0, Math.ceil(remaining))), x, y + 0.5)
-  ctx.restore()
-}
-
-/** Darkened patch left where a molotov/incendiary burned or an HE detonated.
- *  It persists for the rest of the round (cleared when the round changes), so
- *  it marks the affected ground without fading out. Reuses the effect's seeded
- *  irregular outline so the mark matches the affected area. */
-function drawScorch(
-  ev: Extract<Round['events'][number], { type: 'grenade' }>,
-) {
-  if (!ctx) return
-  if (!zOnActiveLevel(ev.z)) return
-  const { x, y } = w2s(ev.x, ev.y)
-  // HE blast covers a smaller area than fire
-  const R = unitsToScreen(ev.kind === 'he' ? 90 : 150)
-  effects.paintScorch(ctx, x, y, R, ev.x * 0.013 + ev.y * 0.017)
-}
-
-const PATH_COLOR: Record<string, string> = {
-  smoke: 'rgba(206, 211, 222, 0.9)',
-  fire: 'rgba(255, 120, 30, 0.9)',
-  he: 'rgba(255, 90, 60, 0.9)',
-  flash: 'rgba(255, 238, 170, 0.9)',
-  decoy: 'rgba(140, 150, 165, 0.9)',
-}
-
-// Grenade kind -> weapon icon label (key into `weaponImgs`). 'fire' covers both
-// molotov and incendiary; we use the molotov icon as the shared symbol.
-const KIND_ICON: Record<string, string> = {
-  smoke: 'Smoke',
-  fire: 'Molotov',
-  he: 'HE',
-  flash: 'Flash',
-  decoy: 'Decoy',
-}
-
-/** Arc of the grenade in flight, traced up to its position at instant t. */
-function drawGrenadePath(path: Round['grenadePaths'][number], t: number) {
-  if (!ctx) return
-  const pts = path.points
-  if (pts.length < 2) return
-  const end = pts[pts.length - 1].t
-  if (t < pts[0].t || t > end + 0.25) return
-
-  // In top-down 2D the flight X/Y is nearly straight (the arc lives on the
-  // invisible Z axis). We bow the line sideways with a sine shape (0 at the
-  // ends, max in the middle) to suggest the arc. The shape is fixed for the
-  // whole trajectory and revealed up to t.
-  const screen = pts.map((p) => w2s(p.x, p.y))
-  const a = screen[0]
-  const b = screen[screen.length - 1]
-  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
-  const nx = -(b.y - a.y) / len
-  const ny = (b.x - a.x) / len
-  const amp = Math.min(len * 0.04, 14)
-  const arc = screen.map((s, i) => {
-    const bow = Math.sin((i / (screen.length - 1)) * Math.PI) * amp
-    return { x: s.x + nx * bow, y: s.y + ny * bow, t: pts[i].t }
-  })
-
-  // points to draw: up to currentT, with the tip interpolated
-  const draw: { x: number; y: number }[] = []
-  for (let i = 0; i < arc.length; i++) {
-    if (arc[i].t <= t) {
-      draw.push(arc[i])
-    } else {
-      const prev = arc[i - 1]
-      const f = (t - prev.t) / (arc[i].t - prev.t)
-      draw.push({ x: prev.x + (arc[i].x - prev.x) * f, y: prev.y + (arc[i].y - prev.y) * f })
-      break
-    }
-  }
-  if (!draw.length) return
-
-  ctx.save()
-  ctx.strokeStyle = PATH_COLOR[path.kind] ?? 'rgba(220,224,232,0.9)'
-  ctx.lineWidth = 1.5
-  ctx.setLineDash([4, 3])
-  ctx.beginPath()
-  ctx.moveTo(draw[0].x, draw[0].y)
-  // smooth by passing through midpoints (quadratics), keeping the curve continuous
-  for (let i = 1; i < draw.length - 1; i++) {
-    const mx = (draw[i].x + draw[i + 1].x) / 2
-    const my = (draw[i].y + draw[i + 1].y) / 2
-    ctx.quadraticCurveTo(draw[i].x, draw[i].y, mx, my)
-  }
-  ctx.lineTo(draw[draw.length - 1].x, draw[draw.length - 1].y)
-  ctx.stroke()
-  ctx.setLineDash([])
-
-  // Tip of the arc: while the grenade is still airborne, draw its icon so the
-  // viewer can tell which grenade it is; once it detonates the effect takes over.
-  const head = draw[draw.length - 1]
-  const img = weaponImgs.get(KIND_ICON[path.kind] ?? '')
-  if (t <= end && img && img.complete && img.naturalWidth) {
-    const boxH = clamp(unitsToScreen(34), 12, 20)
-    const s = boxH / img.naturalHeight
-    const iw = img.naturalWidth * s
-    const ih = boxH
-    ctx.globalAlpha = 1
-    ctx.fillStyle = 'rgba(7, 8, 12, 0.6)'
-    ctx.beginPath()
-    ctx.roundRect(head.x - iw / 2 - 2, head.y - ih / 2 - 1.5, iw + 4, ih + 3, 2)
-    ctx.fill()
-    ctx.drawImage(img, head.x - iw / 2, head.y - ih / 2, iw, ih)
-  } else {
-    ctx.fillStyle = PATH_COLOR[path.kind] ?? '#dee2ea'
-    ctx.beginPath()
-    ctx.arc(head.x, head.y, 3, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  ctx.restore()
-}
-
-/**
- * Draws the ENTIRE arc of a grenade (from throw to impact), ignoring the
- * current time. Used on grenades finder hover to preview the throw without
- * replaying the round. Highlights with a solid line and marks start/end.
- */
-function drawGrenadePathPreview(path: GrenadePath, alpha = 1) {
-  if (!ctx) return
-  const pts = path.points
-  if (pts.length < 2) return
-
-  // Same sine bow as the normal drawing, but revealed in full.
-  const screen = pts.map((p) => w2s(p.x, p.y))
-  const a = screen[0]
-  const b = screen[screen.length - 1]
-  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
-  const nx = -(b.y - a.y) / len
-  const ny = (b.x - a.x) / len
-  const amp = Math.min(len * 0.04, 14)
-  const arc = screen.map((s, i) => {
-    const bow = Math.sin((i / (screen.length - 1)) * Math.PI) * amp
-    return { x: s.x + nx * bow, y: s.y + ny * bow }
-  })
-
-  const color = PATH_COLOR[path.kind] ?? 'rgba(220,224,232,0.95)'
-  ctx.save()
-  ctx.globalAlpha = alpha
-  // Halo escuro por baixo, para destacar sobre qualquer fundo do radar.
-  ctx.strokeStyle = 'rgba(8, 11, 18, 0.7)'
-  ctx.lineWidth = 4
-  ctx.lineJoin = 'round'
-  ctx.beginPath()
-  ctx.moveTo(arc[0].x, arc[0].y)
-  for (let i = 1; i < arc.length - 1; i++) {
-    const mx = (arc[i].x + arc[i + 1].x) / 2
-    const my = (arc[i].y + arc[i + 1].y) / 2
-    ctx.quadraticCurveTo(arc[i].x, arc[i].y, mx, my)
-  }
-  ctx.lineTo(arc[arc.length - 1].x, arc[arc.length - 1].y)
-  ctx.stroke()
-
-  ctx.strokeStyle = color
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(arc[0].x, arc[0].y)
-  for (let i = 1; i < arc.length - 1; i++) {
-    const mx = (arc[i].x + arc[i + 1].x) / 2
-    const my = (arc[i].y + arc[i + 1].y) / 2
-    ctx.quadraticCurveTo(arc[i].x, arc[i].y, mx, my)
-  }
-  ctx.lineTo(arc[arc.length - 1].x, arc[arc.length - 1].y)
-  ctx.stroke()
-
-  // Throw marker (hollow ring) and impact marker (filled disc).
-  const start = arc[0]
-  const end = arc[arc.length - 1]
-  ctx.fillStyle = color
-  ctx.beginPath()
-  ctx.arc(end.x, end.y, 4, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.arc(start.x, start.y, 4, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.restore()
-}
+// Grenade rendering (effects, scorch, flight/preview arcs) lives in its own module
+// to keep this component smaller. It still draws onto our canvas and reuses our
+// transform/active-floor helpers, injected here. `PATH_COLOR`/`KIND_ICON` and the
+// effect radii are reused below by the coach board and grenade hit-testing.
+const {
+  PATH_COLOR,
+  KIND_ICON,
+  smokeRadius,
+  fireRadius,
+  drawGrenade,
+  drawScorch,
+  drawGrenadePath,
+  drawGrenadePathPreview,
+} = useGrenadeRendering({
+  getCtx: () => ctx,
+  w2s,
+  unitsToScreen,
+  zOnActiveLevel,
+  effects,
+  weaponImgs,
+  lowQualityEffects: () => props.lowQualityEffects,
+})
 
 function drawTracer(
   ev: Extract<Round['events'][number], { type: 'shot' }>,
@@ -490,6 +257,88 @@ function blindLevel(steamId: string, t: number) {
     lvl = Math.max(lvl, 1 - (t - b.t) / b.duration)
   }
   return lvl
+}
+
+/**
+ * Per-player jump "lift" [0,1] at time t, derived purely from the Z coordinate
+ * (no parser support needed). A jump is a fast, short Z excursion above the floor;
+ * stairs/ramps rise slowly. We track a per-player ground baseline with an
+ * asymmetric EMA over a lookback window: it follows the player down fast (landing)
+ * but climbs up slowly, so a quick jump outruns it (producing lift) while a gradual
+ * climb keeps up (no lift). `lift` = how far the current Z sits above that baseline,
+ * normalized against a standing-jump apex and floored to ignore step-height noise.
+ */
+function computeJumpLift(t: number): Map<string, number> {
+  const out = new Map<string, number>()
+  const frames = props.round?.frames
+  if (!frames || frames.length < 2) return out
+
+  // Last sampled frame at or before t (binary search).
+  let lo = 0
+  let hi = frames.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1
+    if (frames[mid].t <= t) lo = mid
+    else hi = mid - 1
+  }
+  const end = lo
+  // Window start: walk back ~1.4s so a takeoff frame is included even at the apex.
+  const WINDOW = 1.4
+  let start = end
+  while (start > 0 && frames[end].t - frames[start - 1].t <= WINDOW) start--
+  if (start >= end) return out
+
+  // Asymmetric EMA time constants (seconds) and normalization (game units).
+  const TAU_UP = 0.45 // slow to follow a rise -> jumps create lift
+  const TAU_DOWN = 0.1 // fast to follow a drop -> landing resets cleanly
+  const APEX = 62 // ~standing-jump peak height
+  const FLOOR = 12 // ignore lifts under a step/crouch's worth of Z
+
+  const baseline = new Map<string, number>()
+  const prevT = new Map<string, number>()
+  for (let i = start; i < end; i++) {
+    const ft = frames[i].t
+    for (const p of frames[i].players) {
+      const b = baseline.get(p.steamId)
+      if (b === undefined) {
+        baseline.set(p.steamId, p.z)
+        prevT.set(p.steamId, ft)
+        continue
+      }
+      const dt = ft - (prevT.get(p.steamId) ?? ft)
+      const tau = p.z <= b ? TAU_DOWN : TAU_UP
+      const a = 1 - Math.exp(-dt / tau)
+      baseline.set(p.steamId, b + (p.z - b) * a)
+      prevT.set(p.steamId, ft)
+    }
+  }
+  // Z is sampled at the parser frame rate (8/s) and, unlike x/y, is NOT interpolated
+  // upstream. Interpolate it here between the current and next sample so the lift
+  // varies continuously over time instead of stepping once per ~0.125s frame.
+  const next = end + 1 < frames.length ? end + 1 : end
+  const span = frames[next].t - frames[end].t
+  const frac = span > 1e-6 ? clamp((t - frames[end].t) / span, 0, 1) : 0
+  const zNext = new Map(frames[next].players.map((p) => [p.steamId, p.z]))
+  for (const p of frames[end].players) {
+    const b = baseline.get(p.steamId)
+    if (b === undefined) continue
+    const z = p.z + ((zNext.get(p.steamId) ?? p.z) - p.z) * frac
+    const lift = clamp((z - b - FLOOR) / (APEX - FLOOR), 0, 1)
+    if (lift > 0) out.set(p.steamId, lift)
+  }
+  return out
+}
+
+/** Ground shadow under a jumping player: a flattened, dimmed disc at the floor. */
+function drawJumpShadow(x: number, y: number, r: number, lift: number) {
+  if (!ctx) return
+  ctx.save()
+  ctx.globalAlpha = 0.3 * (1 - 0.2 * lift)
+  ctx.fillStyle = '#000'
+  ctx.beginPath()
+  ctx.ellipse(x, y, r * (1 - 0.1 * lift), r * (0.5 - 0.08 * lift), 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
 }
 
 /**
@@ -816,6 +665,21 @@ function drawPlayer(p: PlayerState, death: { x: number; y: number } | undefined)
   const { x, y } = w2s(base.x, base.y)
   const ang = (-base.yaw * Math.PI) / 180 // screen has Y inverted
 
+  // Jump simulation: when the player is airborne (lift > 0, derived from the Z
+  // baseline), drop a ground shadow at the floor and lift the body off it, scaled
+  // up a touch so it reads as "popping up" toward the top-down camera. The body and
+  // its labels share a single transform; the shadow stays anchored on the ground.
+  const lift = ov ? 0 : (liftMap.get(p.steamId) ?? 0)
+  const jumpGap = lift * r * 1.15
+  const jumpScale = 1 + lift * 0.14
+  if (lift > 0.01) drawJumpShadow(x, y, r, lift)
+  ctx.save()
+  if (lift > 0) {
+    ctx.translate(x, y - jumpGap)
+    ctx.scale(jumpScale, jumpScale)
+    ctx.translate(-x, -y)
+  }
+
   // direction caret: a tip pointing where the player looks. The base goes under
   // the circle, but we clip the disc interior (clip "outside the circle") so only
   // the tip shows. That way the base does not leak when the body is translucent
@@ -876,6 +740,11 @@ function drawPlayer(p: PlayerState, death: { x: number; y: number } | undefined)
     ctx.fill()
     ctx.restore()
   }
+  ctx.restore() // end body jump transform
+
+  // Labels follow the lifted body (offset only, no scale, so text stays crisp).
+  ctx.save()
+  if (jumpGap) ctx.translate(0, -jumpGap)
 
   // name above the circle, in the side color; equipment (icon) above the name.
   const nameBh = 15 * lblScale
@@ -922,6 +791,7 @@ function drawPlayer(p: PlayerState, death: { x: number; y: number } | undefined)
       nameBh,
     )
   }
+  ctx.restore() // end labels jump offset
 }
 
 // --- comments -----------------------------------------------------------------
@@ -1389,6 +1259,7 @@ function draw() {
     ctx.drawImage(radar, panX, panY, L * zoom.value, L * zoom.value)
   }
   const t = props.currentT
+  liftMap = computeJumpLift(t)
 
   // At the end of the round we treat all kills as already happened: the deciding
   // one usually lands right after the last sampled frame.
@@ -1408,14 +1279,20 @@ function draw() {
   for (const path of props.round?.grenadePaths ?? []) {
     if (zOnActiveLevel(grenadePathZ(path))) drawGrenadePath(path, t)
   }
+  // Ground decals first: the burnt mark left after a molotov/incendiary burns out
+  // or an HE detonates (stays for the rest of the round). Drawn before the live
+  // effects so a lingering smoke/fire always renders on top of the scorch instead
+  // of an HE's dark patch covering a smoke that went off at the same spot.
+  for (const ev of props.round?.events ?? []) {
+    if (ev.type !== 'grenade') continue
+    if ((ev.kind === 'fire' || ev.kind === 'he') && t > ev.endT) drawScorch(ev)
+  }
+  // Live grenade effects (smoke/fire/HE ring/flash) over the decals.
   for (const ev of props.round?.events ?? []) {
     if (ev.type !== 'grenade') continue
     // Coach mode imports the active grenades into the board (movable/removable),
     // so skip the replay's own draw to avoid drawing each one twice.
     if (!props.coachMode && t >= ev.t && t <= ev.endT) drawGrenade(ev, t)
-    // burnt mark left after a molotov/incendiary burns out or an HE detonates;
-    // stays for the rest of the round (the round change clears it)
-    else if ((ev.kind === 'fire' || ev.kind === 'he') && t > ev.endT) drawScorch(ev)
   }
   // C4 on the ground / planted (under the players). During the ~3.2s of the plant
   // we do not draw the icon here: the progress ring goes over the planter (below).
