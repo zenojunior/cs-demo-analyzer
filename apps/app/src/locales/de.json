@@ -332,6 +332,8 @@
     "round": "Runde",
     "allRounds": "Alle Runden",
     "jumpHint": "zum Ansehen klicken",
+    "watchInMatch": "Im Match ansehen",
+    "close": "Schließen",
     "time": "Rundenzeit",
     "multiLevelNote": "{map} hat zwei Etagen: jeder Plot zeigt eine Ebene.",
     "team": "Team"

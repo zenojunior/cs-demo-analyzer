@@ -36,6 +36,13 @@ export function useReplay() {
   const frac = ref(0) // progress [0,1] between the base sample and the next one
   const playing = ref(false)
   const speed = ref<number>(1)
+  /**
+   * Optional playback window within the current round (in frame indices), for
+   * embedding a short clip (e.g. the moment around a kill). When set, playback
+   * is bounded to `[fromFrame, toFrame]`: reaching the end loops back to the
+   * start (or pauses if `loop` is false) instead of running to the round's end.
+   */
+  const clip = ref<{ fromFrame: number; toFrame: number; loop: boolean } | null>(null)
   /** When set, reaching the end of a round rolls straight into the next one. */
   const autoAdvance = useLocalStorage('viewer.advanced.autoAdvance', false)
   /**
@@ -233,6 +240,7 @@ export function useReplay() {
   /** Loads a replay already in memory (e.g. from the WASM parser in the worker). */
   function setReplay(r: Replay) {
     pause()
+    clip.value = null
     replay.value = r
     // Open on the first round that actually has frames. Some platforms (Gamers
     // Club) emit a leading frameless "result" round for the knife; starting
@@ -293,6 +301,25 @@ export function useReplay() {
     seek(best)
   }
 
+  /**
+   * Bounds playback to a window of the current round, given in seconds (since
+   * freeze, same units as a frame's `t`), and seeks to its start. Pass `null` to
+   * clear the window and play the whole round again. Call after `selectRound`,
+   * which resets the playhead to the live frame.
+   */
+  function setClip(opts: { from: number; to: number; loop?: boolean } | null) {
+    const frames = round.value?.frames
+    if (!opts || !frames || !frames.length) {
+      clip.value = null
+      return
+    }
+    const fromFrame = frameAtT(frames, opts.from)
+    const toFrame = Math.max(fromFrame, frameAtT(frames, opts.to))
+    clip.value = { fromFrame, toFrame, loop: opts.loop ?? true }
+    frameIndex.value = fromFrame
+    frac.value = 0
+  }
+
   // --- Playback loop (real time, respecting frameRate and speed) ---
   let raf = 0
   let last = 0
@@ -306,6 +333,23 @@ export function useReplay() {
     const frameMs = 1000 / (replay.value?.frameRate ?? 8)
     // continuous position (in samples), advanced by real elapsed time
     const pos = frameIndex.value + frac.value + (dt * speed.value) / frameMs
+
+    // Clipped playback (an embedded clip): bound to the window and loop (or stop)
+    // at its end instead of running to the round's end.
+    const c = clip.value
+    if (c && pos >= c.toFrame) {
+      if (c.loop) {
+        frameIndex.value = c.fromFrame
+        frac.value = 0
+        last = 0 // don't count the loop gap as elapsed time
+        raf = requestAnimationFrame(tick)
+        return
+      }
+      frameIndex.value = c.toFrame
+      frac.value = 0
+      pause()
+      return
+    }
 
     // End of the round. With autoAdvance on, roll into the next round and keep
     // playing; otherwise stop here (advancing is manual).
@@ -378,6 +422,7 @@ export function useReplay() {
     selectRound,
     seek,
     seekBySeconds,
+    setClip,
     play,
     pause,
     toggle,

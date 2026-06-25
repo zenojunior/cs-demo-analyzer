@@ -34,6 +34,10 @@ function fmtTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+// Clip padding: a touch before the blind, to a touch after the kill it enabled.
+const CLIP_LEAD = 1
+const CLIP_TAIL = 2
+
 /** Builds the popover lines for a flasher's impact plays (optionally one type). */
 function playsToDetails(steamId: string, only?: FlashPlay['type']): CellDetail[] {
   const plays = stats.value.playsByPlayer.get(steamId) ?? []
@@ -50,6 +54,15 @@ function playsToDetails(steamId: string, only?: FlashPlay['type']): CellDetail[]
             }),
       sub: `R${p.roundNumber} · ${fmtTime(p.killT)} · ${p.weapon.toUpperCase()}`,
       jump: { roundIndex: p.roundIndex, t: p.blindT },
+      // Frame the flasher, the blinded victim and the killer (deduped) over the
+      // flash and the kill it set up.
+      clip: {
+        round: p.roundIndex,
+        jumpT: p.blindT,
+        from: p.blindT - CLIP_LEAD,
+        to: p.killT + CLIP_TAIL,
+        focusSteamIds: [...new Set([steamId, p.victimSteamId, p.killerSteamId])],
+      },
     }))
 }
 
@@ -224,7 +237,12 @@ function cellStyle(v: number, teamFlash: boolean) {
         <section class="mt-10">
           <h3 class="mb-1 font-display text-sm text-ink-50">{{ t('utilities.flash.impactTitle') }}</h3>
           <p class="mb-3 text-xs text-ink-500">{{ t('utilities.flash.impactHint') }}</p>
-          <UtilityTeamGrid :teams="teams" :rows="impactRows" @jump="(p) => emit('jump', p)" />
+          <UtilityTeamGrid
+            :teams="teams"
+            :rows="impactRows"
+            :replay="replay"
+            @jump="(p) => emit('jump', p)"
+          />
         </section>
 
         <!-- Blind-duration matrix -->
