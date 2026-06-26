@@ -1,4 +1,4 @@
-# CS Demo Analyzer
+# CS2d.app
 
 The fastest free browser-based 2D replay analyzer for **Counter-Strike 2**
 demos. Drop a `.dem` file and rewatch the match round by round: no install,

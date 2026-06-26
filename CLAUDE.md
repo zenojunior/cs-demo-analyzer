@@ -1,4 +1,4 @@
-# CS Demo Analyzer
+# CS2d.app
 
 ## Workflow rules
 
