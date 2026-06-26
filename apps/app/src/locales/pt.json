@@ -3,6 +3,7 @@
     "offlineReady": "Pronto para funcionar offline.",
     "updateAvailable": "Nova versão disponível.",
     "reload": "Atualizar",
+    "reloading": "Atualizando…",
     "dismiss": "Agora não"
   },
   "shell": {
