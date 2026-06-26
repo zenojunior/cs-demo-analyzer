@@ -3,6 +3,7 @@
     "offlineReady": "Готово к работе офлайн.",
     "updateAvailable": "Доступна новая версия.",
     "reload": "Обновить",
+    "reloading": "Обновление…",
     "dismiss": "Не сейчас"
   },
   "shell": {

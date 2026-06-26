@@ -3,6 +3,7 @@
     "offlineReady": "Çevrimdışı çalışmaya hazır.",
     "updateAvailable": "Yeni bir sürüm mevcut.",
     "reload": "Yeniden yükle",
+    "reloading": "Güncelleniyor…",
     "dismiss": "Şimdi değil"
   },
   "shell": {

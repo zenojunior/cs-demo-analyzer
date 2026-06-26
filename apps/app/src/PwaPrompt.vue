@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRegisterSW } from 'virtual:pwa-register/vue'
+import UiIcon from '@/ui/UiIcon.vue'
 import { useI18n } from '@/i18n'
 
 /**
@@ -10,6 +12,20 @@ import { useI18n } from '@/i18n'
  */
 const { t } = useI18n()
 const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW()
+
+const reloading = ref(false)
+
+async function reload() {
+  if (reloading.value) return
+  reloading.value = true
+  try {
+    await updateServiceWorker(true)
+  } catch {
+    // Fallback below still forces a reload.
+  }
+  // Force a reload if controllerchange never fires, so the click is never a no-op.
+  window.setTimeout(() => window.location.reload(), 3000)
+}
 
 function dismiss() {
   offlineReady.value = false
@@ -27,12 +43,15 @@ function dismiss() {
       <span>{{ needRefresh ? t('pwa.updateAvailable') : t('pwa.offlineReady') }}</span>
       <button
         v-if="needRefresh"
-        class="rounded-md bg-[#FDAC1A] px-3 py-1 font-medium text-black transition hover:brightness-110"
-        @click="updateServiceWorker(true)"
+        class="flex items-center gap-1.5 rounded-md bg-[#FDAC1A] px-3 py-1 font-medium text-black transition hover:brightness-110 disabled:cursor-default disabled:opacity-80 disabled:hover:brightness-100"
+        :disabled="reloading"
+        @click="reload"
       >
-        {{ t('pwa.reload') }}
+        <UiIcon v-if="reloading" name="loader" class="h-3.5 w-3.5 animate-spin" />
+        {{ reloading ? t('pwa.reloading') : t('pwa.reload') }}
       </button>
       <button
+        v-if="!reloading"
         class="rounded-md px-2 py-1 text-white/60 transition hover:text-white"
         @click="dismiss"
       >
