@@ -11,6 +11,7 @@ import { isKnifeRound, roundSides } from '@/viewer/analysis/utilityStats'
 import UiSelect from '@/ui/UiSelect.vue'
 import RoundTimeRange from '@/viewer/analysis/RoundTimeRange.vue'
 import RoundStrip from '@/viewer/analysis/RoundStrip.vue'
+import { freezeSeconds, maxLiveRoundTime } from '@/viewer/analysis/roundTime'
 import { useI18n } from '@/i18n'
 
 const { t } = useI18n()
@@ -70,14 +71,10 @@ watch(teamFilter, (team) => {
 // Round-time window (live seconds, i.e. since the round went live), so the
 // heatmap can be narrowed to a moment of the round (e.g. the last X seconds).
 const timeRange = ref<number[]>([0, 0])
-/** Freeze-time duration of a round, in seconds (event/frame `t` is since freeze). */
-function freezeSeconds(round: Round): number {
-  return (round.startTick - round.freezeStartTick) / props.replay.demoTickRate
-}
 // Absolute tick ranges of match pauses (tactical timeouts / tech pauses). While
 // paused, every player stands frozen at spawn, so those frames would pile
 // hundreds of samples onto a handful of base spots and dwarf the real positions.
-// They are dropped from the presence heatmap (and from the slider's range below).
+// They are dropped from the presence heatmap.
 const pauseRanges = computed(() =>
   (props.replay.pauses ?? []).map((p) => [p.startTick, p.endTick] as const),
 )
@@ -85,20 +82,8 @@ function isPaused(tick: number): boolean {
   for (const [start, end] of pauseRanges.value) if (tick >= start && tick <= end) return true
   return false
 }
-/** Longest live round time across the match (excluding pauses): the slider's
- *  upper bound. The last frame can fall inside a pause, so scan for the latest
- *  non-paused frame rather than just taking `frames.at(-1)`. */
-const maxRoundTime = computed(() => {
-  let max = 0
-  for (const round of props.replay.rounds) {
-    const fz = freezeSeconds(round)
-    for (const f of round.frames) {
-      if (isPaused(f.tick)) continue
-      max = Math.max(max, f.t - fz)
-    }
-  }
-  return Math.ceil(max)
-})
+// Slider's upper bound: longest live round time across the match (pauses excluded).
+const maxRoundTime = computed(() => maxLiveRoundTime(props.replay))
 // Default window per page: kills/deaths span the whole round (those events land
 // late, not just in the opening), so they start at the full range; presence and
 // grenades default to the first 30 live seconds (mostly opening positioning).
@@ -205,7 +190,7 @@ const rawPoints = computed<Pt[]>(() => {
     if (roundFilter.value !== 'all' && idx !== roundFilter.value) return
     // The knife round has no meaningful positions to map, so skip it entirely.
     if (isKnifeRound(round)) return
-    const fz = freezeSeconds(round)
+    const fz = freezeSeconds(round, props.replay.demoTickRate)
     if (props.source === 'deaths') {
       for (const ev of round.events) {
         if (ev.type !== 'kill') continue
