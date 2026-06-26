@@ -99,8 +99,18 @@ const maxRoundTime = computed(() => {
   }
   return Math.ceil(max)
 })
-// Start (and reset, if the demo changes) with the first 30 live seconds selected.
-watch(maxRoundTime, (m) => (timeRange.value = [0, Math.min(30, m)]), { immediate: true })
+// Default window per page: kills/deaths span the whole round (those events land
+// late, not just in the opening), so they start at the full range; presence and
+// grenades default to the first 30 live seconds (mostly opening positioning).
+const defaultMaxTime = computed(() =>
+  props.source === 'kills' || props.source === 'deaths'
+    ? maxRoundTime.value
+    : Math.min(30, maxRoundTime.value),
+)
+// Start (and reset on demo change or page switch) at that page's natural window.
+watch([maxRoundTime, () => props.source], () => (timeRange.value = [0, defaultMaxTime.value]), {
+  immediate: true,
+})
 const isFullRange = computed(
   () => timeRange.value[0] <= 0 && timeRange.value[1] >= maxRoundTime.value,
 )
