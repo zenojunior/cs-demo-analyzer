@@ -431,7 +431,7 @@ function onImportInput(e: Event) {
           :id="currentId ?? undefined"
           :file-name="parser.fileName.value"
           :skip-freeze="skipFreeze"
-          :autoplay="autoplay"
+          :autoplay="autoplay && activeTab === 'viewer'"
         />
       </div>
       <HeatmapView

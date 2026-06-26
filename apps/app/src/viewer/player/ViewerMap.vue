@@ -61,6 +61,9 @@ const props = defineProps<{
   levelRange?: { minZ: number; maxZ: number } | null
   /** Show the zoom buttons (hidden in the decorative preview). Default: true. */
   controls?: boolean
+  /** Burn a small "CS2d.app" mark into the bottom-right corner (used while
+   *  recording an exported clip, so shared videos carry the branding). */
+  watermark?: boolean
   /** Comments anchored to the current round (pins drawn on the map). */
   comments?: ReplayComment[]
   /** Comment mode: a click on the map drops a new comment pin. */
@@ -205,7 +208,7 @@ function worldToClient(wx: number, wy: number): { x: number; y: number } | null 
   const rect = cv.getBoundingClientRect()
   return { x: rect.left + x, y: rect.top + y }
 }
-defineExpose({ worldToClient })
+defineExpose({ worldToClient, canvas })
 
 // Dot radius sized in game units (~hitbox), so it grows with the map on zoom
 // ("real" size). The clamp only keeps it from disappearing / blowing up.
@@ -1576,10 +1579,29 @@ function draw() {
     drawAreaHandles(f.x, f.y, resizing.sx, resizing.sy)
   }
 
+  // Branding burned into the corner (only while recording an exported clip).
+  if (props.watermark) drawWatermark()
+
   // Keep the open popover pinned to its anchor as the view or the player moves.
   if (props.popoverAnchor) {
     emit('popoverMoved', popoverAnchorRect(props.popoverAnchor))
   }
+}
+
+/** Draws the "CS2d.app" mark in the bottom-right corner, in screen space (fixed
+ *  to the canvas, unaffected by zoom/pan), with a soft shadow for legibility. */
+function drawWatermark() {
+  if (!ctx) return
+  ctx.save()
+  const pad = Math.max(6, Math.round(ch * 0.022))
+  ctx.font = `600 ${Math.max(11, Math.round(ch * 0.034))}px system-ui, -apple-system, sans-serif`
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'bottom'
+  ctx.shadowColor = 'rgba(0,0,0,0.65)'
+  ctx.shadowBlur = 4
+  ctx.fillStyle = 'rgba(255,255,255,0.88)'
+  ctx.fillText('CS2d.app', cw - pad, ch - pad)
+  ctx.restore()
 }
 
 // --- auto zoom: frames all players, easing in/out ---
