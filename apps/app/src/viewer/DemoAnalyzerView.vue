@@ -489,18 +489,18 @@ function onImportInput(e: Event) {
           <button
             type="button"
             class="shrink-0 cursor-pointer whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors"
-            :class="activeTab === 'economy' ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
-            @click="goTab('economy')"
-          >
-            {{ t('tabs.economy') }}
-          </button>
-          <button
-            type="button"
-            class="shrink-0 cursor-pointer whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors"
             :class="activeTab === 'duels' ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
             @click="goTab('duels')"
           >
             {{ t('tabs.duels') }}
+          </button>
+          <button
+            type="button"
+            class="shrink-0 cursor-pointer whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors"
+            :class="activeTab === 'economy' ? 'bg-ink-700 text-ink-50' : 'text-ink-300 hover:text-ink-100'"
+            @click="goTab('economy')"
+          >
+            {{ t('tabs.economy') }}
           </button>
         </div>
       </Teleport>
